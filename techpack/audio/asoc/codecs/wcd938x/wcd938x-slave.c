@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/module.h>
+#include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/platform_device.h>
 #include <linux/device.h>
@@ -24,8 +25,7 @@
 #define SWR_SLV_MAX_DEVICES     2
 #endif /* CONFIG_DEBUG_FS */
 
-#define SWR_MAX_RETRY    5
-
+#define SWR_MAX_RETRY 5
 struct wcd938x_slave_priv {
 	struct swr_device *swr_slave;
 #ifdef CONFIG_DEBUG_FS

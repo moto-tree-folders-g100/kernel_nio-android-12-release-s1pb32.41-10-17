@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/init.h>
 #include <linux/err.h>
@@ -13,6 +12,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/of.h>
 #include <linux/freezer.h>
+#include <linux/version.h>
 #include <sound/core.h>
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
@@ -20,7 +20,7 @@
 #include <sound/timer.h>
 #include <sound/initval.h>
 #include <sound/control.h>
-#include <audio/sound/lsm_params.h>
+#include <sound/lsm_params.h>
 #include <sound/pcm_params.h>
 #include <dsp/msm_audio_ion.h>
 #include <dsp/q6lsm.h>
@@ -412,7 +412,6 @@ static void lsm_event_handler(uint32_t opcode, uint32_t token,
 		if (!temp) {
 			dev_err(rtd->dev, "%s: no memory for event status\n",
 				__func__);
-			spin_unlock_irqrestore(&prtd->event_lock, flags);
 			__pm_relax(prtd->ws);
 			return;
 		}
@@ -501,71 +500,38 @@ static int msm_lsm_get_conf_levels(struct lsm_client *client,
 {
 	int rc = 0;
 
-	if (client->num_sound_models != 0) {
-		if (client->num_keywords == 0) {
-			pr_debug("%s: no number of confidence_values provided\n",
-				 __func__);
-			client->multi_snd_model_confidence_levels = NULL;
-			goto done;
-		}
-
-		client->multi_snd_model_confidence_levels =
-			kzalloc((sizeof(uint32_t) * client->num_keywords),
-				 GFP_KERNEL);
-		if (!client->multi_snd_model_confidence_levels) {
-			pr_err("%s: No memory for confidence\n"
-				"levels num of level from user = %d\n",
-				__func__, client->num_keywords);
-				rc = -ENOMEM;
-				goto done;
-		}
-
-		if (copy_from_user((u8 *)client->multi_snd_model_confidence_levels,
-				   conf_levels_ptr,
-				   sizeof(uint32_t) * client->num_keywords)) {
-			pr_err("%s: copy from user failed, number of keywords = %d\n",
-			       __func__, client->num_keywords);
-			rc = -EFAULT;
-			goto copy_err;
-		}
-	} else {
-		if (client->num_confidence_levels == 0) {
-			pr_debug("%s: no confidence levels provided\n",
-				 __func__);
-			client->confidence_levels = NULL;
-			goto done;
-		}
-
-		client->confidence_levels =
-			kzalloc((sizeof(uint8_t) * client->num_confidence_levels),
-				 GFP_KERNEL);
-		if (!client->confidence_levels) {
-			pr_err("%s: No memory for confidence\n"
-				"levels num of level from user = %d\n",
-				__func__, client->num_confidence_levels);
-				rc = -ENOMEM;
-				goto done;
-		}
-
-		if (copy_from_user(client->confidence_levels,
-				   conf_levels_ptr,
-				   client->num_confidence_levels)) {
-			pr_err("%s: copy from user failed, size = %d\n",
-			       __func__, client->num_confidence_levels);
-			rc = -EFAULT;
-			goto copy_err;
-		}
+	if (client->num_confidence_levels == 0) {
+		pr_debug("%s: no confidence levels provided\n",
+			__func__);
+		client->confidence_levels = NULL;
+		goto done;
 	}
+
+	client->confidence_levels =
+		kzalloc((sizeof(uint8_t) * client->num_confidence_levels),
+			 GFP_KERNEL);
+	if (!client->confidence_levels) {
+		pr_err("%s: No memory for confidence\n"
+			"levels num of level from user = %d\n",
+			__func__, client->num_confidence_levels);
+			rc = -ENOMEM;
+			goto done;
+	}
+
+	if (copy_from_user(client->confidence_levels,
+			   conf_levels_ptr,
+			   client->num_confidence_levels)) {
+		pr_err("%s: copy from user failed, size = %d\n",
+		       __func__, client->num_confidence_levels);
+		rc = -EFAULT;
+		goto copy_err;
+	}
+
 	return rc;
 
 copy_err:
-	if (client->num_sound_models != 0) {
-		kfree(client->multi_snd_model_confidence_levels);
-		client->multi_snd_model_confidence_levels = NULL;
-	} else {
-		kfree(client->confidence_levels);
-		client->confidence_levels = NULL;
-	}
+	kfree(client->confidence_levels);
+	client->confidence_levels = NULL;
 done:
 	return rc;
 
@@ -687,67 +653,35 @@ static int msm_lsm_set_conf(struct snd_pcm_substream *substream,
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	int rc = 0;
 
-	if (p_info->param_type == LSM_MULTI_SND_MODEL_CONFIDENCE_LEVELS) {
-		if (p_info->param_size > MAX_KEYWORDS_SUPPORTED) {
-			dev_err(rtd->dev,
-				"%s: invalid number of snd_model keywords %d, the max is %d\n",
-				__func__, p_info->param_size, MAX_KEYWORDS_SUPPORTED);
-			return -EINVAL;
-		}
+	if (p_info->param_size > MAX_NUM_CONFIDENCE) {
+		dev_err(rtd->dev,
+			"%s: invalid confidence levels %d\n",
+			__func__, p_info->param_size);
+		return -EINVAL;
+	}
 
-		prtd->lsm_client->num_keywords = p_info->param_size;
-		rc = msm_lsm_get_conf_levels(prtd->lsm_client,
-					     p_info->param_data);
-		if (rc) {
-			dev_err(rtd->dev,
-				"%s: get_conf_levels failed for snd_model %d, err = %d\n",
-				__func__, p_info->model_id, rc);
-			return rc;
-		}
+	prtd->lsm_client->num_confidence_levels =
+			p_info->param_size;
+	rc = msm_lsm_get_conf_levels(prtd->lsm_client,
+				     p_info->param_data);
+	if (rc) {
+		dev_err(rtd->dev,
+			"%s: get_conf_levels failed, err = %d\n",
+			__func__, rc);
+		return rc;
+	}
 
-		rc = q6lsm_set_one_param(prtd->lsm_client, p_info,
-					 prtd->lsm_client->multi_snd_model_confidence_levels,
-					 LSM_MULTI_SND_MODEL_CONFIDENCE_LEVELS);
-		if (rc)
-			dev_err(rtd->dev,
-				"%s: Failed to set multi_snd_model_confidence_levels, err = %d\n",
-				__func__, rc);
+	rc = q6lsm_set_one_param(prtd->lsm_client, p_info,
+				 prtd->lsm_client->confidence_levels,
+				 LSM_MIN_CONFIDENCE_LEVELS);
+	if (rc)
+		dev_err(rtd->dev,
+			"%s: Failed to set min_conf_levels, err = %d\n",
+			__func__, rc);
 
-		if (prtd->lsm_client->multi_snd_model_confidence_levels) {
-			kfree(prtd->lsm_client->multi_snd_model_confidence_levels);
-			prtd->lsm_client->multi_snd_model_confidence_levels = NULL;
-		}
-	} else {
-		if (p_info->param_size > MAX_NUM_CONFIDENCE) {
-			dev_err(rtd->dev,
-				"%s: invalid confidence levels %d\n",
-				__func__, p_info->param_size);
-			return -EINVAL;
-		}
-
-		prtd->lsm_client->num_confidence_levels =
-				p_info->param_size;
-		rc = msm_lsm_get_conf_levels(prtd->lsm_client,
-					     p_info->param_data);
-		if (rc) {
-			dev_err(rtd->dev,
-				"%s: get_conf_levels failed, err = %d\n",
-				__func__, rc);
-			return rc;
-		}
-
-		rc = q6lsm_set_one_param(prtd->lsm_client, p_info,
-					 prtd->lsm_client->confidence_levels,
-					 LSM_MIN_CONFIDENCE_LEVELS);
-		if (rc)
-			dev_err(rtd->dev,
-				"%s: Failed to set min_conf_levels, err = %d\n",
-				__func__, rc);
-
-		if (prtd->lsm_client->confidence_levels) {
-			kfree(prtd->lsm_client->confidence_levels);
-			prtd->lsm_client->confidence_levels = NULL;
-		}
+	if (prtd->lsm_client->confidence_levels) {
+		kfree(prtd->lsm_client->confidence_levels);
+		prtd->lsm_client->confidence_levels = NULL;
 	}
 	return rc;
 }
@@ -758,174 +692,66 @@ static int msm_lsm_reg_model(struct snd_pcm_substream *substream,
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct lsm_priv *prtd = runtime->private_data;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	int rc = 0, stage_idx = p_info->stage_idx;
+	int rc = 0;
 	struct lsm_sound_model *sm = NULL;
 	size_t offset = sizeof(union param_hdrs);
-	struct lsm_client *client = prtd->lsm_client;
 
-	if (p_info->model_id != 0 &&
-	    p_info->param_type == LSM_REG_MULTI_SND_MODEL) {
-		sm = kzalloc(sizeof(*sm), GFP_KERNEL);
-		if (sm == NULL) {
-			dev_err(rtd->dev, "%s: snd_model kzalloc failed\n", __func__);
-			return -ENOMEM;
-		}
-
-		INIT_LIST_HEAD(&sm->list);
-
-		rc = q6lsm_snd_model_buf_alloc(client, p_info->param_size, p_info, sm);
-		if (rc) {
-			dev_err(rtd->dev, "%s: snd_model buf alloc failed, size = %d\n",
-				__func__, p_info->param_size);
-			goto err_buf_alloc;
-		}
-
-		q6lsm_sm_set_param_data(client, p_info, &offset, sm);
-
-		/*
-		 * For set_param, advance the sound model data with the
-		 * number of bytes required by param_data.
-		 */
-		if (copy_from_user((u8 *)sm->data + offset,
-			p_info->param_data, p_info->param_size)) {
-			dev_err(rtd->dev,
-				"%s: copy_from_user for snd_model %d failed, size = %d\n",
-				__func__, p_info->model_id, p_info->param_size);
-			rc = -EFAULT;
-			goto err_copy;
-		}
-		/* Add this sound model to the list of multi sound models */
-		list_add_tail(&sm->list, &client->stage_cfg[stage_idx].sound_models);
-
-		rc = q6lsm_set_one_param(client, p_info, NULL,
-					 LSM_REG_MULTI_SND_MODEL);
-		if (rc) {
-			dev_err(rtd->dev,
-				"%s: Failed to register snd_model %d, err = %d\n",
-				__func__, p_info->model_id, rc);
-			goto err_copy;
-		}
-
-		client->num_sound_models++;
-		dev_dbg(rtd->dev,
-			"%s: registered snd_model: %d, total num of snd_model: %d\n",
-			__func__, p_info->model_id, client->num_sound_models);
-	} else if (p_info->model_id == 0 &&
-		   p_info->param_type == LSM_REG_SND_MODEL) {
-		sm = &client->stage_cfg[stage_idx].sound_model;
-
-		rc = q6lsm_snd_model_buf_alloc(client, p_info->param_size, p_info, sm);
-		if (rc) {
-			dev_err(rtd->dev, "%s: snd_model buf alloc failed, size = %d\n",
-				__func__, p_info->param_size);
-			return rc;
-		}
-
-		q6lsm_sm_set_param_data(client, p_info, &offset, sm);
-
-		/*
-		 * For set_param, advance the sound model data with the
-		 * number of bytes required by param_data.
-		 */
-
-		if (copy_from_user((u8 *)sm->data + offset,
-		    p_info->param_data, p_info->param_size)) {
-			dev_err(rtd->dev,
-				"%s: copy_from_user for snd_model failed, size = %d\n",
-				__func__, p_info->param_size);
-			rc = -EFAULT;
-			goto err_copy;
-		}
-		rc = q6lsm_set_one_param(client, p_info, NULL, LSM_REG_SND_MODEL);
-		if (rc) {
-			dev_err(rtd->dev, "%s: Failed to register snd_model, err = %d\n",
-				__func__, rc);
-			goto err_copy;
-		}
-	} else {
+	rc = q6lsm_snd_model_buf_alloc(prtd->lsm_client,
+				       p_info->param_size, p_info);
+	if (rc) {
 		dev_err(rtd->dev,
-			"%s: snd_model id %d is invalid for param type %d\n",
-			__func__, p_info->model_id, p_info->param_type);
+			"%s: snd_model buf alloc failed, size = %d\n",
+			__func__, p_info->param_size);
+		return rc;
+	}
+
+	q6lsm_sm_set_param_data(prtd->lsm_client, p_info, &offset);
+
+	/*
+	 * For set_param, advance the sound model data with the
+	 * number of bytes required by param_data.
+	 */
+
+	sm = &prtd->lsm_client->stage_cfg[p_info->stage_idx].sound_model;
+	if (copy_from_user((u8 *)sm->data + offset,
+			   p_info->param_data, p_info->param_size)) {
+		dev_err(rtd->dev,
+			"%s: copy_from_user for snd_model failed, size = %d\n",
+			__func__, p_info->param_size);
+		rc = -EFAULT;
+		goto err_copy;
+	}
+	rc = q6lsm_set_one_param(prtd->lsm_client, p_info, NULL,
+				 LSM_REG_SND_MODEL);
+	if (rc) {
+		dev_err(rtd->dev,
+			"%s: Failed to set sound_model, err = %d\n",
+			__func__, rc);
+		goto err_copy;
 	}
 	return rc;
 
 err_copy:
-	q6lsm_snd_model_buf_free(client, p_info, sm);
-err_buf_alloc:
-	if (p_info->model_id != 0) {
-		list_del(&sm->list);
-		kfree(sm);
-		sm = NULL;
-	}
+	q6lsm_snd_model_buf_free(prtd->lsm_client, p_info);
 	return rc;
 }
 
 static int msm_lsm_dereg_model(struct snd_pcm_substream *substream,
-			struct lsm_params_info_v2 *p_info)
+		struct lsm_params_info_v2 *p_info)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct lsm_priv *prtd = runtime->private_data;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct lsm_sound_model *sm = NULL;
-	struct lsm_client *client = prtd->lsm_client;
 	int rc = 0;
 
-	if (p_info->model_id != 0 &&
-		p_info->param_type == LSM_DEREG_MULTI_SND_MODEL) {
-		list_for_each_entry(sm,
-				   &client->stage_cfg[p_info->stage_idx].sound_models,
-				   list) {
-			dev_dbg(rtd->dev,
-				"%s: current snd_model: %d, looking for snd_model %d\n",
-				 __func__, sm->model_id, p_info->model_id);
-			if (sm->model_id == p_info->model_id)
-				break;
-		}
-
-		if (sm->model_id == p_info->model_id) {
-			if (p_info->param_size != sizeof(p_info->model_id)) {
-				rc = -EINVAL;
-				pr_err("%s: %s failed, p_info->param_size is invalid: %d\n",
-				       __func__,  "LSM_DEREG_MULTI_SND_MODEL",
-				       p_info->param_size);
-			} else {
-				rc = q6lsm_set_one_param(client, p_info, NULL,
-							 LSM_DEREG_MULTI_SND_MODEL);
-			}
-
-			if (rc)
-				dev_err(rtd->dev,
-					"%s: Failed to deregister snd_model %d, err = %d\n",
-					__func__, p_info->model_id, rc);
-
-			q6lsm_snd_model_buf_free(client, p_info, sm);
-			list_del(&sm->list);
-			kfree(sm);
-			sm = NULL;
-			client->num_sound_models--;
-		} else {
-			rc = -EINVAL;
-			dev_err(rtd->dev,
-				"%s: Failed to find snd_model, invalid model_id %d\n",
-				__func__, p_info->model_id);
-		}
-	} else if (p_info->model_id == 0 &&
-		   p_info->param_type == LSM_DEREG_SND_MODEL) {
-		rc = q6lsm_set_one_param(client, p_info, NULL,
-					 LSM_DEREG_SND_MODEL);
-		if (rc)
-			dev_err(rtd->dev,
-				"%s: Failed to deregister snd_model, err = %d\n",
-				__func__, rc);
-
-		sm = &client->stage_cfg[p_info->stage_idx].sound_model;
-		q6lsm_snd_model_buf_free(client, p_info, sm);
-	} else {
-		rc = -EINVAL;
+	rc = q6lsm_set_one_param(prtd->lsm_client, p_info,
+				 NULL, LSM_DEREG_SND_MODEL);
+	if (rc)
 		dev_err(rtd->dev,
-			"%s: snd_model id %d is invalid for param type %d\n",
-			__func__, p_info->model_id, p_info->param_type);
-	}
+			"%s: Failed to set det_mode param, err = %d\n",
+			__func__, rc);
+
+	q6lsm_snd_model_buf_free(prtd->lsm_client, p_info);
 
 	return rc;
 }
@@ -1167,22 +993,6 @@ static int msm_lsm_process_params(struct snd_pcm_substream *substream,
 		return -EINVAL;
 	}
 
-	if (p_info->param_type == LSM_REG_MULTI_SND_MODEL &&
-		prtd->lsm_client->num_sound_models == LSM_MAX_SOUND_MODELS_SUPPORTED) {
-		dev_err(rtd->dev,
-			"%s: maximum supported sound models(8) have already reached\n",
-			__func__);
-		return -EINVAL;
-	}
-
-	if (p_info->param_type == LSM_DEREG_MULTI_SND_MODEL &&
-		prtd->lsm_client->num_sound_models == 0) {
-		dev_err(rtd->dev,
-			"%s: no available sound model to be deregistered\n",
-			__func__);
-		return -EINVAL;
-	}
-
 	switch (p_info->param_type) {
 	case LSM_ENDPOINT_DETECT_THRESHOLD:
 		rc = msm_lsm_set_epd(substream, p_info);
@@ -1194,15 +1004,12 @@ static int msm_lsm_process_params(struct snd_pcm_substream *substream,
 		rc = msm_lsm_set_gain(substream, p_info);
 		break;
 	case LSM_MIN_CONFIDENCE_LEVELS:
-	case LSM_MULTI_SND_MODEL_CONFIDENCE_LEVELS:
 		rc = msm_lsm_set_conf(substream, p_info);
 		break;
 	case LSM_REG_SND_MODEL:
-	case LSM_REG_MULTI_SND_MODEL:
 		rc = msm_lsm_reg_model(substream, p_info);
 		break;
 	case LSM_DEREG_SND_MODEL:
-	case LSM_DEREG_MULTI_SND_MODEL:
 		rc = msm_lsm_dereg_model(substream, p_info);
 		break;
 	case LSM_CUSTOM_PARAMS:
@@ -1262,7 +1069,7 @@ static int msm_lsm_ioctl_shared(struct snd_pcm_substream *substream,
 			 unsigned int cmd, void *arg)
 {
 	struct snd_soc_pcm_runtime *rtd;
-	unsigned long flags = 0;
+	unsigned long flags;
 	int ret;
 	struct snd_lsm_sound_model_v2 snd_model_v2;
 	struct snd_lsm_session_data session_data;
@@ -1370,10 +1177,7 @@ static int msm_lsm_ioctl_shared(struct snd_pcm_substream *substream,
 		 * also set stage index to LSM_STAGE_INDEX_FIRST.
 		 */
 		struct lsm_params_info_v2 p_info = {0};
-		struct lsm_sound_model *sm = NULL;
 		p_info.stage_idx = LSM_STAGE_INDEX_FIRST;
-		p_info.param_type = LSM_DEREG_SND_MODEL;
-		sm = &prtd->lsm_client->stage_cfg[p_info.stage_idx].sound_model;
 
 		dev_dbg(rtd->dev, "%s: Registering sound model V2\n",
 			__func__);
@@ -1389,20 +1193,21 @@ static int msm_lsm_ioctl_shared(struct snd_pcm_substream *substream,
 			break;
 		}
 		rc = q6lsm_snd_model_buf_alloc(prtd->lsm_client,
-					snd_model_v2.data_size, &p_info, sm);
+					snd_model_v2.data_size, &p_info);
 		if (rc) {
 			dev_err(rtd->dev,
 				"%s: q6lsm buffer alloc failed V2, size %d\n",
 			       __func__, snd_model_v2.data_size);
 			break;
 		}
-		if (copy_from_user(sm->data, snd_model_v2.data,
-						   snd_model_v2.data_size)) {
+		if (copy_from_user(
+				prtd->lsm_client->stage_cfg[p_info.stage_idx].sound_model.data,
+				snd_model_v2.data, snd_model_v2.data_size)) {
 			dev_err(rtd->dev,
 				"%s: copy from user data failed\n"
 			       "data %pK size %d\n", __func__,
 			       snd_model_v2.data, snd_model_v2.data_size);
-			q6lsm_snd_model_buf_free(prtd->lsm_client, &p_info, sm);
+			q6lsm_snd_model_buf_free(prtd->lsm_client, &p_info);
 			rc = -EFAULT;
 			break;
 		}
@@ -1430,7 +1235,7 @@ static int msm_lsm_ioctl_shared(struct snd_pcm_substream *substream,
 			dev_err(rtd->dev,
 				"%s: Register snd Model v2 failed =%d\n",
 			       __func__, rc);
-			q6lsm_snd_model_buf_free(prtd->lsm_client, &p_info, sm);
+			q6lsm_snd_model_buf_free(prtd->lsm_client, &p_info);
 		}
 		if (prtd->lsm_client->confidence_levels) {
 			kfree(prtd->lsm_client->confidence_levels);
@@ -1893,7 +1698,6 @@ struct lsm_params_info_v2_32 {
 	uint32_t param_type;
 	u16 instance_id;
 	u16 stage_idx;
-	u32 model_id;
 };
 
 struct lsm_params_get_info_32 {
@@ -1928,7 +1732,6 @@ enum {
 		_IOWR('U', 0x14, struct lsm_params_get_info_32),
 };
 
-#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 static int msm_lsm_ioctl_compat(struct snd_pcm_substream *substream,
 			  unsigned int cmd, void __user *arg)
 {
@@ -2006,7 +1809,7 @@ static int msm_lsm_ioctl_compat(struct snd_pcm_substream *substream,
 
 		/* Update size with actual payload size */
 		size = sizeof(userarg32) + user->payload_size;
-		if (!access_ok(arg, size)) {
+		if (!access_ok(VERIFY_WRITE, arg, size)) {
 			dev_err(rtd->dev,
 				"%s: Failed to verify write, size = %d\n",
 				__func__, size);
@@ -2081,7 +1884,7 @@ static int msm_lsm_ioctl_compat(struct snd_pcm_substream *substream,
 
 		/* Update size with actual payload size */
 		size = sizeof(userarg32) + user->payload_size;
-		if (!err && !access_ok(arg, size)) {
+		if (!err && !access_ok(VERIFY_WRITE, arg, size)) {
 			dev_err(rtd->dev,
 				"%s: write verify failed size %d\n",
 				__func__, size);
@@ -2243,9 +2046,9 @@ static int msm_lsm_ioctl_compat(struct snd_pcm_substream *substream,
 
 		if (p_data.data_size != expected_size) {
 			dev_err(rtd->dev,
-				"%s: %s: Invalid size %d, expected_size %d\n",
+				"%s: %s: Invalid size %d\n",
 				__func__, "SET_MODULE_PARAMS(_V2)_32",
-				p_data.data_size, expected_size);
+				p_data.data_size);
 			err = -EINVAL;
 			goto done;
 		}
@@ -2281,7 +2084,6 @@ static int msm_lsm_ioctl_compat(struct snd_pcm_substream *substream,
 
 				p_info.instance_id = INSTANCE_ID_0;
 				p_info.stage_idx = LSM_STAGE_INDEX_FIRST;
-				p_info.model_id = 0;
 
 				p_info_32++;
 			} else {
@@ -2293,14 +2095,6 @@ static int msm_lsm_ioctl_compat(struct snd_pcm_substream *substream,
 
 				p_info.instance_id = p_info_v2_32->instance_id;
 				p_info.stage_idx = p_info_v2_32->stage_idx;
-				/* set sound model id to 0 for backward compatibility */
-				p_info.model_id = 0;
-
-				if (LSM_REG_MULTI_SND_MODEL == p_info_v2_32->param_type ||
-				    LSM_DEREG_MULTI_SND_MODEL == p_info_v2_32->param_type ||
-				    LSM_MULTI_SND_MODEL_CONFIDENCE_LEVELS ==
-								p_info_v2_32->param_type)
-					p_info.model_id = p_info_v2_32->model_id;
 
 				p_info_v2_32++;
 			}
@@ -2381,7 +2175,7 @@ static int msm_lsm_ioctl_compat(struct snd_pcm_substream *substream,
 			goto done;
 		}
 
-		if (!access_ok(arg, size)) {
+		if (!access_ok(VERIFY_WRITE, arg, size)) {
 			dev_err(rtd->dev,
 				"%s: Failed to verify write, size = %d\n",
 				__func__, size);
@@ -2426,7 +2220,6 @@ done:
 	mutex_unlock(&prtd->lsm_api_lock);
 	return err;
 }
-#endif /* CONFIG_AUDIO_QGKI */
 #else
 #define msm_lsm_ioctl_compat NULL
 #endif
@@ -2521,8 +2314,6 @@ static int msm_lsm_ioctl(struct snd_pcm_substream *substream,
 		size_t p_size = 0, count;
 		u8 *params;
 
-		memset(&info_v2, 0, sizeof(info_v2));
-
 		if (!prtd->lsm_client->use_topology) {
 			dev_err(rtd->dev,
 				"%s: %s: not supported if not using topology\n",
@@ -2595,30 +2386,18 @@ static int msm_lsm_ioctl(struct snd_pcm_substream *substream,
 
 				info_v2.instance_id = INSTANCE_ID_0;
 				info_v2.stage_idx = LSM_STAGE_INDEX_FIRST;
-				info_v2.model_id = 0;
 
 				ptr_info_v2 = &info_v2;
 				temp_ptr_info++;
 			} else {
-				if (LSM_REG_MULTI_SND_MODEL != temp_ptr_info_v2->param_type ||
-				    LSM_DEREG_MULTI_SND_MODEL !=
-								temp_ptr_info_v2->param_type ||
-				    LSM_MULTI_SND_MODEL_CONFIDENCE_LEVELS !=
-								temp_ptr_info_v2->param_type) {
-					/* set sound model id to 0 for backward compatibility */
-					temp_ptr_info_v2->model_id = 0;
-				}
-				/*
-				 * Just copy the pointer as user
-				 * already provided sound model id
-				 */
+				/* Just copy the pointer as user already provided v2 params */
 				ptr_info_v2 = temp_ptr_info_v2;
 				temp_ptr_info_v2++;
 			}
 			err = msm_lsm_process_params(substream, ptr_info_v2);
 			if (err)
 				dev_err(rtd->dev,
-					"%s: Failed to process param, type=%d stage=%d err=%d\n",
+					"%s: Failed to process param, type%d stage=%d err=%d\n",
 					__func__, ptr_info_v2->param_type,
 					ptr_info_v2->stage_idx, err);
 		}
@@ -2646,7 +2425,7 @@ static int msm_lsm_ioctl(struct snd_pcm_substream *substream,
 			err = -EFAULT;
 			goto done;
 		}
-		size = sizeof(temp_p_info) +  temp_p_info.param_size;
+		size = sizeof(temp_p_info) + temp_p_info.param_size;
 		p_info = kzalloc(size, GFP_KERNEL);
 
 		if (!p_info) {
@@ -2679,7 +2458,7 @@ static int msm_lsm_ioctl(struct snd_pcm_substream *substream,
 			goto free;
 		}
 
-		if (!access_ok(arg, size)) {
+		if (!access_ok(VERIFY_WRITE, arg, size)) {
 			dev_err(rtd->dev,
 				"%s: Failed to verify write, size = %d\n",
 				__func__, size);
@@ -2756,7 +2535,7 @@ free:
 
 		/* Update size with actual payload size */
 		size = sizeof(*user) + user->payload_size;
-		if (!access_ok(arg, size)) {
+		if (!access_ok(VERIFY_WRITE, arg, size)) {
 			dev_err(rtd->dev,
 				"%s: Failed to verify write, size = %d\n",
 				__func__, size);
@@ -2828,7 +2607,7 @@ free:
 
 		/* Update size with actual payload size */
 		size = sizeof(*user) + user->payload_size;
-		if (!err && !access_ok(arg, size)) {
+		if (!err && !access_ok(VERIFY_WRITE, arg, size)) {
 			dev_err(rtd->dev,
 				"%s: write verify failed size %d\n",
 				__func__, size);
@@ -2861,7 +2640,7 @@ static int msm_lsm_open(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct lsm_priv *prtd;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	int ret = 0, i;
+	int ret = 0;
 
 	pr_debug("%s\n", __func__);
 	prtd = kzalloc(sizeof(struct lsm_priv), GFP_KERNEL);
@@ -2927,15 +2706,11 @@ static int msm_lsm_open(struct snd_pcm_substream *substream)
 	prtd->lsm_client->event_type = LSM_DET_EVENT_TYPE_LEGACY;
 	prtd->lsm_client->fe_id = rtd->dai_link->id;
 	prtd->lsm_client->unprocessed_data = 0;
-	prtd->lsm_client->num_sound_models = 0;
-	prtd->lsm_client->num_keywords = 0;
-	prtd->lsm_client->multi_snd_model_confidence_levels = NULL;
-
-	for (i = 0; i < LSM_MAX_STAGES_PER_SESSION; i++)
-		INIT_LIST_HEAD(&prtd->lsm_client->stage_cfg[i].sound_models);
-
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 110))
 	prtd->ws = wakeup_source_register(rtd->dev, "lsm-client");
-
+#else
+	prtd->ws = wakeup_source_register("lsm-client");
+#endif
 	return 0;
 }
 
@@ -3094,6 +2869,14 @@ static int msm_lsm_close(struct snd_pcm_substream *substream)
 						__func__, ret);
 				prtd->lsm_client->lab_started = false;
 			}
+			if (prtd->lsm_client->lab_buffer) {
+				ret = msm_lsm_lab_buffer_alloc(prtd,
+						LAB_BUFFER_DEALLOC);
+				if (ret)
+					dev_err(rtd->dev,
+						"%s: lab buffer dealloc failed ret %d\n",
+						__func__, ret);
+			}
 		}
 
 		if (!atomic_read(&prtd->read_abort)) {
@@ -3111,30 +2894,21 @@ static int msm_lsm_close(struct snd_pcm_substream *substream)
 				"%s: LSM client session stopped %d\n",
 				 __func__, ret);
 
+		/*
+		 * Go Ahead and try de-register sound model,
+		 * even if stop failed
+		 */
 		prtd->lsm_client->started = false;
-	}
 
-	if (prtd->lsm_client->lab_enable && prtd->lsm_client->lab_buffer) {
-		ret = msm_lsm_lab_buffer_alloc(prtd,
-				LAB_BUFFER_DEALLOC);
+		ret = q6lsm_deregister_sound_model(prtd->lsm_client);
 		if (ret)
 			dev_err(rtd->dev,
-				"%s: lab buffer dealloc failed ret %d\n",
+				"%s: dereg_snd_model failed, err = %d\n",
 				__func__, ret);
+		else
+			dev_dbg(rtd->dev, "%s: dereg_snd_model successful\n",
+				 __func__);
 	}
-
-	/*
-	 * De-register existing sound models
-	 * to free SM and CAL buffer, even if
-	 * lsm client is not started.
-	 */
-	ret = q6lsm_deregister_sound_model(prtd->lsm_client);
-	if (ret)
-		dev_err(rtd->dev, "%s: dereg_snd_model failed, err = %d\n",
-			__func__, ret);
-	else
-		dev_dbg(rtd->dev, "%s: dereg_snd_model successful\n",
-			__func__);
 
 	msm_pcm_routing_dereg_phy_stream(rtd->dai_link->id,
 					SNDRV_PCM_STREAM_CAPTURE);
@@ -3369,7 +3143,6 @@ static int msm_lsm_pcm_copy(struct snd_pcm_substream *substream, int ch,
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 static int msm_lsm_app_type_cfg_ctl_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
@@ -3451,14 +3224,7 @@ static int msm_lsm_add_app_type_controls(struct snd_soc_pcm_runtime *rtd)
 	kctl->get = msm_lsm_app_type_cfg_ctl_get;
 	return 0;
 }
-#else
-static int msm_lsm_add_app_type_controls(struct snd_soc_pcm_runtime *rtd)
-{
-	return 0;
-}
-#endif /* CONFIG_AUDIO_QGKI */
 
-#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 static int msm_lsm_afe_data_ctl_put(struct snd_kcontrol *kcontrol,
 				    struct snd_ctl_elem_value *ucontrol)
 {
@@ -3522,12 +3288,6 @@ static int msm_lsm_add_afe_data_controls(struct snd_soc_pcm_runtime *rtd)
 
 	return 0;
 }
-#else
-static int msm_lsm_add_afe_data_controls(struct snd_soc_pcm_runtime *rtd)
-{
-	return 0;
-}
-#endif /* CONFIG_AUDIO_QGKI */
 
 static int msm_lsm_add_controls(struct snd_soc_pcm_runtime *rtd)
 {
@@ -3549,9 +3309,7 @@ static const struct snd_pcm_ops msm_lsm_ops = {
 	.close          = msm_lsm_close,
 	.ioctl          = msm_lsm_ioctl,
 	.prepare	= msm_lsm_prepare,
-#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 	.compat_ioctl   = msm_lsm_ioctl_compat,
-#endif /* CONFIG_AUDIO_QGKI */
 	.hw_params      = msm_lsm_hw_params,
 	.copy_user      = msm_lsm_pcm_copy,
 	.pointer        = msm_lsm_pcm_pointer,

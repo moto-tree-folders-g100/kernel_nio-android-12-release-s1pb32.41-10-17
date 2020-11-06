@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2010-2014, 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2010-2014, 2016-2020 The Linux Foundation. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -22,10 +22,8 @@
 #include <linux/slab.h>
 #include <linux/ipc_logging.h>
 #include <linux/of_platform.h>
-#include <linux/ratelimit.h>
-#include <soc/qcom/boot_stats.h>
 #include <soc/qcom/subsystem_restart.h>
-#include <linux/qcom_scm.h>
+#include <soc/qcom/scm.h>
 #include <soc/snd_event.h>
 #include <dsp/apr_audio-v2.h>
 #include <dsp/audio_notifier.h>
@@ -34,14 +32,9 @@
 
 #define APR_PKT_IPC_LOG_PAGE_CNT 2
 
-static int apr_pkt_cnt_adsp_restart = 20;
-module_param(apr_pkt_cnt_adsp_restart, int, 0664);
-MODULE_PARM_DESC(apr_pkt_cnt_adsp_restart, "set apr pktcount for adsp restart feature");
-
 static struct apr_q6 q6;
 static struct apr_client client[APR_DEST_MAX][APR_CLIENT_MAX];
 static void *apr_pkt_ctx;
-static int apr_send_pkt_count;
 static wait_queue_head_t modem_wait;
 static bool is_modem_up;
 static char *subsys_name = NULL;
@@ -68,8 +61,6 @@ struct apr_private {
 
 static struct apr_private *apr_priv;
 static bool apr_cf_debug;
-static struct work_struct apr_cb_work;
-static void state_notify_cb(struct work_struct *work);
 
 #ifdef CONFIG_DEBUG_FS
 static struct dentry *debugfs_apr_debug;
@@ -248,7 +239,7 @@ void apr_set_modem_state(enum apr_subsys_state state)
 }
 EXPORT_SYMBOL(apr_set_modem_state);
 
-static enum apr_subsys_state apr_cmpxchg_modem_state(enum apr_subsys_state prev,
+enum apr_subsys_state apr_cmpxchg_modem_state(enum apr_subsys_state prev,
 					      enum apr_subsys_state new)
 {
 	return atomic_cmpxchg(&q6.modem_state, prev, new);
@@ -315,7 +306,6 @@ static void apr_add_child_devices(struct work_struct *work)
 static void apr_adsp_up(void)
 {
 	pr_info("%s: Q6 is Up\n", __func__);
-	place_marker("M - ADSP Ready");
 	apr_set_q6_state(APR_SUBSYS_LOADED);
 
 	spin_lock(&apr_priv->apr_lock);
@@ -323,7 +313,6 @@ static void apr_adsp_up(void)
 		schedule_work(&apr_priv->add_chld_dev_work);
 	spin_unlock(&apr_priv->apr_lock);
 	snd_event_notify(apr_priv->dev, SND_EVENT_UP);
-	cancel_work_sync(&apr_cb_work);
 }
 
 int apr_load_adsp_image(void)
@@ -373,7 +362,6 @@ int apr_send_pkt(void *handle, uint32_t *buf)
 	uint16_t w_len;
 	int rc;
 	unsigned long flags;
-	static DEFINE_RATELIMIT_STATE(rtl, 1 * HZ, 1);
 
 	if (!handle || !buf) {
 		pr_err("APR: Wrong parameters for %s\n",
@@ -387,8 +375,7 @@ int apr_send_pkt(void *handle, uint32_t *buf)
 
 	if ((svc->dest_id == APR_DEST_QDSP6) &&
 	    (apr_get_q6_state() != APR_SUBSYS_LOADED)) {
-		if (__ratelimit(&rtl))
-			pr_err_ratelimited("%s: Still dsp is not Up\n", __func__);
+		pr_err_ratelimited("%s: Still dsp is not Up\n", __func__);
 		return -ENETRESET;
 	} else if ((svc->dest_id == APR_DEST_MODEM) &&
 		   (apr_get_modem_state() == APR_SUBSYS_DOWN)) {
@@ -428,7 +415,7 @@ int apr_send_pkt(void *handle, uint32_t *buf)
 		w_len = rc;
 		if (w_len != hdr->pkt_size) {
 			pr_err("%s: Unable to write whole APR pkt successfully: %d\n",
-				__func__, rc);
+			       __func__, rc);
 			rc = -EINVAL;
 		}
 	} else {
@@ -437,21 +424,8 @@ int apr_send_pkt(void *handle, uint32_t *buf)
 		if (rc == -ECONNRESET) {
 			pr_err_ratelimited("%s: Received reset error from tal\n",
 					__func__);
-			if (svc->dest_id == APR_DEST_QDSP6)
-				apr_set_q6_state(APR_SUBSYS_DOWN);
 			rc = -ENETRESET;
 		}
-		if (rc == -EAGAIN || rc == -ETIMEDOUT) {
-			apr_send_pkt_count++;
-			pr_err("%s:: send pkt timedout apr_send_pkt_count %d\n",
-				__func__, apr_send_pkt_count);
-		}
-	}
-	if (apr_send_pkt_count == apr_pkt_cnt_adsp_restart) {
-		pr_debug("%s:: schedule work for adsp loader restart cb\n",
-				__func__);
-		schedule_work(&apr_cb_work);
-		apr_send_pkt_count = 0;
 	}
 	spin_unlock_irqrestore(&svc->w_lock, flags);
 
@@ -825,19 +799,6 @@ static void apr_reset_deregister(struct work_struct *work)
 	apr_deregister(handle);
 	kfree(apr_reset);
 }
-
-static void state_notify_cb(struct work_struct *work)
-{
-	if (q6.state_notify_cb)
-		q6.state_notify_cb(APR_SUBSYS_UNKNOWN, q6.client_handle);
-}
-
-void apr_register_adsp_state_cb(void *adsp_cb, void *client_handle)
-{
-	q6.state_notify_cb = adsp_cb;
-	q6.client_handle = client_handle;
-}
-EXPORT_SYMBOL(apr_register_adsp_state_cb);
 
 /**
  * apr_start_rx_rt - Clients call to vote for thread
@@ -1214,12 +1175,10 @@ static int apr_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-#ifdef CONFIG_IPC_LOGGING
 	apr_pkt_ctx = ipc_log_context_create(APR_PKT_IPC_LOG_PAGE_CNT,
 						"apr", 0);
 	if (!apr_pkt_ctx)
 		pr_err("%s: Unable to create ipc log context\n", __func__);
-#endif  /* CONFIG_IPC_LOGGING */
 
 	spin_lock(&apr_priv->apr_lock);
 	apr_priv->is_initial_boot = true;
@@ -1253,7 +1212,7 @@ static int apr_probe(struct platform_device *pdev)
 			__func__, ret);
 		ret = 0;
 	}
-	INIT_WORK(&apr_cb_work, state_notify_cb);
+
 	return apr_debug_init();
 }
 

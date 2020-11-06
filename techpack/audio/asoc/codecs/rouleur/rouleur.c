@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -27,7 +27,8 @@
 #include <dt-bindings/sound/audio-codec-port-types.h>
 #include <asoc/msm-cdc-supply.h>
 #include <linux/power_supply.h>
-#include "asoc/bolero-slave-internal.h"
+
+#define DRV_NAME "rouleur_codec"
 
 #define NUM_SWRS_DT_PARAMS 5
 
@@ -39,18 +40,6 @@
 #define LOW_SOC_MBIAS_REG_MIN_VOLTAGE 2850000
 
 #define FOUNDRY_ID_SEC 0x5
-
-#define ROULEUR_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |\
-			SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_48000 |\
-			SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_192000 |\
-			SNDRV_PCM_RATE_384000)
-/* Fractional Rates */
-#define ROULEUR_FRAC_RATES (SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_88200 |\
-				SNDRV_PCM_RATE_176400 | SNDRV_PCM_RATE_352800)
-
-#define ROULEUR_FORMATS (SNDRV_PCM_FMTBIT_S16_LE |\
-		SNDRV_PCM_FMTBIT_S24_LE |\
-		SNDRV_PCM_FMTBIT_S24_3LE | SNDRV_PCM_FMTBIT_S32_LE)
 
 enum {
 	CODEC_TX = 0,
@@ -107,29 +96,6 @@ static struct regmap_irq_chip rouleur_regmap_irq_chip = {
 	.irq_drv_data = NULL,
 };
 
-static struct snd_soc_dai_driver rouleur_dai[] = {
-	{
-		.name = "rouleur_cdc",
-		.playback = {
-			.stream_name = "ROULEUR_AIF Playback",
-			.rates = ROULEUR_RATES | ROULEUR_FRAC_RATES,
-			.formats = ROULEUR_FORMATS,
-			.rate_max = 384000,
-			.rate_min = 8000,
-			.channels_min = 1,
-			.channels_max = 2,
-		},
-		.capture = {
-			.stream_name = "ROULEUR_AIF Capture",
-			.rates = ROULEUR_RATES,
-			.formats = ROULEUR_FORMATS,
-			.rate_max = 192000,
-			.rate_min = 8000,
-			.channels_min = 1,
-			.channels_max = 2,
-		},
-	},
-};
 static int rouleur_handle_post_irq(void *data)
 {
 	struct rouleur_priv *rouleur = data;
@@ -680,7 +646,7 @@ static int rouleur_codec_enable_hphr_pa(struct snd_soc_dapm_widget *w,
 		/* Enable HD2 Config for HPHR if foundry id is SEC */
 		if (rouleur->foundry_id == FOUNDRY_ID_SEC)
 			rouleur->update_wcd_event(rouleur->handle,
-						SLV_BOLERO_EVT_HPHR_HD2_ENABLE,
+						WCD_BOLERO_EVT_HPHR_HD2_ENABLE,
 						0x04);
 		snd_soc_component_update_bits(component,
 			ROULEUR_DIG_SWR_PDM_WD_CTL1,
@@ -698,7 +664,7 @@ static int rouleur_codec_enable_hphr_pa(struct snd_soc_dapm_widget *w,
 
 		if (rouleur->update_wcd_event)
 			rouleur->update_wcd_event(rouleur->handle,
-						SLV_BOLERO_EVT_RX_MUTE,
+						WCD_BOLERO_EVT_RX_MUTE,
 						(WCD_RX2 << 0x10));
 		wcd_enable_irq(&rouleur->irq_info,
 				ROULEUR_IRQ_HPHR_PDM_WD_INT);
@@ -708,7 +674,7 @@ static int rouleur_codec_enable_hphr_pa(struct snd_soc_dapm_widget *w,
 				ROULEUR_IRQ_HPHR_PDM_WD_INT);
 		if (rouleur->update_wcd_event)
 			rouleur->update_wcd_event(rouleur->handle,
-						SLV_BOLERO_EVT_RX_MUTE,
+						WCD_BOLERO_EVT_RX_MUTE,
 						(WCD_RX2 << 0x10 | 0x1));
 		blocking_notifier_call_chain(&rouleur->mbhc->notifier,
 					     WCD_EVENT_PRE_HPHR_PA_OFF,
@@ -728,7 +694,7 @@ static int rouleur_codec_enable_hphr_pa(struct snd_soc_dapm_widget *w,
 
 		if (rouleur->foundry_id == FOUNDRY_ID_SEC)
 			rouleur->update_wcd_event(rouleur->handle,
-						SLV_BOLERO_EVT_HPHR_HD2_ENABLE,
+						WCD_BOLERO_EVT_HPHR_HD2_ENABLE,
 						0x00);
 		blocking_notifier_call_chain(&rouleur->mbhc->notifier,
 					     WCD_EVENT_POST_HPHR_PA_OFF,
@@ -762,7 +728,7 @@ static int rouleur_codec_enable_hphl_pa(struct snd_soc_dapm_widget *w,
 		usleep_range(200, 210);
 		if (rouleur->foundry_id == FOUNDRY_ID_SEC)
 			rouleur->update_wcd_event(rouleur->handle,
-						SLV_BOLERO_EVT_HPHL_HD2_ENABLE,
+						WCD_BOLERO_EVT_HPHL_HD2_ENABLE,
 						0x04);
 		snd_soc_component_update_bits(component,
 				ROULEUR_DIG_SWR_PDM_WD_CTL0,
@@ -780,7 +746,7 @@ static int rouleur_codec_enable_hphl_pa(struct snd_soc_dapm_widget *w,
 
 		if (rouleur->update_wcd_event)
 			rouleur->update_wcd_event(rouleur->handle,
-						SLV_BOLERO_EVT_RX_MUTE,
+						WCD_BOLERO_EVT_RX_MUTE,
 						(WCD_RX1 << 0x10));
 		wcd_enable_irq(&rouleur->irq_info,
 				ROULEUR_IRQ_HPHL_PDM_WD_INT);
@@ -790,7 +756,7 @@ static int rouleur_codec_enable_hphl_pa(struct snd_soc_dapm_widget *w,
 				ROULEUR_IRQ_HPHL_PDM_WD_INT);
 		if (rouleur->update_wcd_event)
 			rouleur->update_wcd_event(rouleur->handle,
-						SLV_BOLERO_EVT_RX_MUTE,
+						WCD_BOLERO_EVT_RX_MUTE,
 						(WCD_RX1 << 0x10 | 0x1));
 		blocking_notifier_call_chain(&rouleur->mbhc->notifier,
 					     WCD_EVENT_PRE_HPHL_PA_OFF,
@@ -809,7 +775,7 @@ static int rouleur_codec_enable_hphl_pa(struct snd_soc_dapm_widget *w,
 
 		if (rouleur->foundry_id == FOUNDRY_ID_SEC)
 			rouleur->update_wcd_event(rouleur->handle,
-						SLV_BOLERO_EVT_HPHL_HD2_ENABLE,
+						WCD_BOLERO_EVT_HPHL_HD2_ENABLE,
 						0x00);
 		blocking_notifier_call_chain(&rouleur->mbhc->notifier,
 					     WCD_EVENT_POST_HPHL_PA_OFF,
@@ -853,7 +819,7 @@ static int rouleur_codec_enable_ear_pa(struct snd_soc_dapm_widget *w,
 				0x40, 0x00);
 		if (rouleur->foundry_id == FOUNDRY_ID_SEC)
 			rouleur->update_wcd_event(rouleur->handle,
-						SLV_BOLERO_EVT_HPHL_HD2_ENABLE,
+						WCD_BOLERO_EVT_HPHL_HD2_ENABLE,
 						0x04);
 		snd_soc_component_update_bits(component,
 				ROULEUR_DIG_SWR_PDM_WD_CTL0,
@@ -866,7 +832,7 @@ static int rouleur_codec_enable_ear_pa(struct snd_soc_dapm_widget *w,
 				0x0F, 0x04);
 		if (rouleur->update_wcd_event)
 			rouleur->update_wcd_event(rouleur->handle,
-						SLV_BOLERO_EVT_RX_MUTE,
+						WCD_BOLERO_EVT_RX_MUTE,
 						(WCD_RX1 << 0x10));
 		wcd_enable_irq(&rouleur->irq_info,
 				ROULEUR_IRQ_HPHL_PDM_WD_INT);
@@ -876,14 +842,14 @@ static int rouleur_codec_enable_ear_pa(struct snd_soc_dapm_widget *w,
 				ROULEUR_IRQ_HPHL_PDM_WD_INT);
 		if (rouleur->update_wcd_event)
 			rouleur->update_wcd_event(rouleur->handle,
-						SLV_BOLERO_EVT_RX_MUTE,
+						WCD_BOLERO_EVT_RX_MUTE,
 						(WCD_RX1 << 0x10 | 0x1));
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		usleep_range(5000, 5100);
 		if (rouleur->foundry_id == FOUNDRY_ID_SEC)
 			rouleur->update_wcd_event(rouleur->handle,
-						SLV_BOLERO_EVT_HPHL_HD2_ENABLE,
+						WCD_BOLERO_EVT_HPHL_HD2_ENABLE,
 						0x00);
 		snd_soc_component_update_bits(component,
 				ROULEUR_DIG_SWR_PDM_WD_CTL0,
@@ -931,7 +897,7 @@ static int rouleur_codec_enable_lo_pa(struct snd_soc_dapm_widget *w,
 				0x0F, 0x04);
 		if (rouleur->update_wcd_event)
 			rouleur->update_wcd_event(rouleur->handle,
-						SLV_BOLERO_EVT_RX_MUTE,
+						WCD_BOLERO_EVT_RX_MUTE,
 						(WCD_RX1 << 0x10));
 		wcd_enable_irq(&rouleur->irq_info,
 				ROULEUR_IRQ_HPHL_PDM_WD_INT);
@@ -941,7 +907,7 @@ static int rouleur_codec_enable_lo_pa(struct snd_soc_dapm_widget *w,
 					ROULEUR_IRQ_HPHL_PDM_WD_INT);
 		if (rouleur->update_wcd_event)
 			rouleur->update_wcd_event(rouleur->handle,
-						SLV_BOLERO_EVT_RX_MUTE,
+						WCD_BOLERO_EVT_RX_MUTE,
 						(WCD_RX1 << 0x10 | 0x1));
 		break;
 	case SND_SOC_DAPM_POST_PMD:
@@ -1405,10 +1371,10 @@ void rouleur_disable_bcs_before_slow_insert(struct snd_soc_component *component,
 	if (rouleur->update_wcd_event) {
 		if (bcs_disable)
 			rouleur->update_wcd_event(rouleur->handle,
-						SLV_BOLERO_EVT_BCS_CLK_OFF, 0);
+						WCD_BOLERO_EVT_BCS_CLK_OFF, 0);
 		else
 			rouleur->update_wcd_event(rouleur->handle,
-						SLV_BOLERO_EVT_BCS_CLK_OFF, 1);
+						WCD_BOLERO_EVT_BCS_CLK_OFF, 1);
 	}
 }
 
@@ -1454,7 +1420,7 @@ static int rouleur_event_notify(struct notifier_block *block,
 	struct wcd_mbhc *mbhc;
 
 	switch (event) {
-	case BOLERO_SLV_EVT_PA_OFF_PRE_SSR:
+	case BOLERO_WCD_EVT_PA_OFF_PRE_SSR:
 		snd_soc_component_update_bits(component,
 					ROULEUR_ANA_HPHPA_CNP_CTL_2,
 					0xC0, 0x00);
@@ -1471,7 +1437,7 @@ static int rouleur_event_notify(struct notifier_block *block,
 				ROULEUR_ANA_COMBOPA_CTL,
 				0x80, 0x00);
 		break;
-	case BOLERO_SLV_EVT_SSR_DOWN:
+	case BOLERO_WCD_EVT_SSR_DOWN:
 		rouleur->dev_up = false;
 		rouleur->mbhc->wcd_mbhc.deinit_in_progress = true;
 		mbhc = &rouleur->mbhc->wcd_mbhc;
@@ -1480,7 +1446,7 @@ static int rouleur_event_notify(struct notifier_block *block,
 		rouleur_mbhc_ssr_down(rouleur->mbhc, component);
 		rouleur_reset(rouleur->dev, 0x01);
 		break;
-	case BOLERO_SLV_EVT_SSR_UP:
+	case BOLERO_WCD_EVT_SSR_UP:
 		rouleur_reset(rouleur->dev, 0x00);
 		/* allow reset to take effect */
 		usleep_range(10000, 10010);
@@ -1797,15 +1763,15 @@ static const struct snd_soc_dapm_widget rouleur_dapm_widgets[] = {
 				SND_SOC_DAPM_POST_PMD),
 
 	/* micbias widgets*/
-	SND_SOC_DAPM_SUPPLY("MIC BIAS1", SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_MICBIAS_E("MIC BIAS1", SND_SOC_NOPM, 0, 0,
 				rouleur_codec_enable_micbias,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
 				SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_SUPPLY("MIC BIAS2", SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_MICBIAS_E("MIC BIAS2", SND_SOC_NOPM, 0, 0,
 				rouleur_codec_enable_micbias,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
 				SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_SUPPLY("MIC BIAS3", SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_MICBIAS_E("MIC BIAS3", SND_SOC_NOPM, 0, 0,
 				rouleur_codec_enable_micbias,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
 				SND_SOC_DAPM_POST_PMD),
@@ -1875,15 +1841,15 @@ static const struct snd_soc_dapm_widget rouleur_dapm_widgets[] = {
 	SND_SOC_DAPM_OUTPUT("HPHR"),
 
 	/* micbias pull up widgets*/
-	SND_SOC_DAPM_SUPPLY("VA MIC BIAS1", SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_MICBIAS_E("VA MIC BIAS1", SND_SOC_NOPM, 0, 0,
 				rouleur_codec_enable_micbias_pullup,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
 				SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_SUPPLY("VA MIC BIAS2", SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_MICBIAS_E("VA MIC BIAS2", SND_SOC_NOPM, 0, 0,
 				rouleur_codec_enable_micbias_pullup,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
 				SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_SUPPLY("VA MIC BIAS3", SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_MICBIAS_E("VA MIC BIAS3", SND_SOC_NOPM, 0, 0,
 				rouleur_codec_enable_micbias_pullup,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
 				SND_SOC_DAPM_POST_PMD),
@@ -2010,7 +1976,7 @@ int rouleur_info_create_codec_entry(struct snd_info_entry *codec_root,
 		return 0;
 	}
 	card = component->card;
-	priv->entry = snd_info_create_module_entry(codec_root->module,
+	priv->entry = snd_info_create_subdir(codec_root->module,
 					     "rouleur", codec_root);
 	if (!priv->entry) {
 		dev_dbg(component->dev, "%s: failed to create rouleur entry\n",
@@ -2128,7 +2094,7 @@ static void rouleur_evaluate_soc(struct work_struct *work)
 		/* Reduce PA Gain by 6DB for low SoC */
 		if (rouleur->update_wcd_event)
 			rouleur->update_wcd_event(rouleur->handle,
-					SLV_BOLERO_EVT_RX_PA_GAIN_UPDATE,
+					WCD_BOLERO_EVT_RX_PA_GAIN_UPDATE,
 					true);
 		rouleur->low_soc = true;
 		ret = msm_cdc_set_supply_min_voltage(rouleur->dev,
@@ -2147,7 +2113,7 @@ static void rouleur_evaluate_soc(struct work_struct *work)
 			/* Reset PA Gain to default for normal SoC */
 			if (rouleur->update_wcd_event)
 				rouleur->update_wcd_event(rouleur->handle,
-					SLV_BOLERO_EVT_RX_PA_GAIN_UPDATE,
+					WCD_BOLERO_EVT_RX_PA_GAIN_UPDATE,
 					false);
 			ret = msm_cdc_set_supply_min_voltage(rouleur->dev,
 						rouleur->supplies,
@@ -2180,7 +2146,7 @@ static void rouleur_get_foundry_id(struct rouleur_priv *rouleur)
 		pr_debug("%s: rouleur foundry id = %x\n", rouleur->foundry_id,
 			 __func__);
 	else
-		pr_debug("%s: rouleur error in spmi read ret = %d\n",
+		pr_debug("%s: rouleur error spmi read ret = %d\n",
 			 __func__, ret);
 }
 
@@ -2304,7 +2270,7 @@ static int rouleur_soc_codec_resume(struct snd_soc_component *component)
 }
 
 static const struct snd_soc_component_driver soc_codec_dev_rouleur = {
-	.name = ROULEUR_DRV_NAME,
+	.name = DRV_NAME,
 	.probe = rouleur_soc_codec_probe,
 	.remove = rouleur_soc_codec_remove,
 	.controls = rouleur_snd_controls,
@@ -2715,7 +2681,7 @@ static int rouleur_bind(struct device *dev)
 	wcd_disable_irq(&rouleur->irq_info, ROULEUR_IRQ_HPHL_PDM_WD_INT);
 
 	ret = snd_soc_register_component(dev, &soc_codec_dev_rouleur,
-				     rouleur_dai, ARRAY_SIZE(rouleur_dai));
+				     NULL, 0);
 	if (ret) {
 		dev_err(dev, "%s: Codec registration failed\n",
 				__func__);

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2019, 2020, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -15,10 +15,10 @@
 #include <linux/sched.h>
 #include <linux/freezer.h>
 #include <sound/soc.h>
-#include <audio/sound/lsm_params.h>
+#include <sound/lsm_params.h>
 #include <sound/pcm_params.h>
 #include "msm-slim-dma.h"
-#include "codecs/cpe_core.h"
+#include <asoc/cpe_core.h>
 
 #define DRV_NAME "msm-cpe-lsm"
 
@@ -2422,7 +2422,6 @@ enum {
 		_IOW('U', 0x0B, struct snd_lsm_module_params_32),
 };
 
-#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 static int msm_cpe_lsm_ioctl_compat(struct snd_pcm_substream *substream,
 			 unsigned int cmd, void *arg)
 {
@@ -2849,13 +2848,7 @@ done:
 			     "lsm_api_lock");
 	return err;
 }
-#else
-static int msm_cpe_lsm_ioctl_compat(struct snd_pcm_substream *substream,
-			 unsigned int cmd, void *arg)
-{
-	return 0;
-}
-#endif /* CONFIG_AUDIO_QGKI */
+
 #else
 #define msm_cpe_lsm_ioctl_compat NULL
 #endif
@@ -3293,9 +3286,7 @@ static const struct snd_pcm_ops msm_cpe_lsm_ops = {
 	.pointer = msm_cpe_lsm_pointer,
 	.copy_user = msm_cpe_lsm_copy,
 	.hw_params = msm_cpe_lsm_hwparams,
-#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 	.compat_ioctl = msm_cpe_lsm_ioctl_compat,
-#endif /* CONFIG_AUDIO_QGKI */
 };
 
 static struct snd_soc_component_driver msm_soc_cpe_component = {

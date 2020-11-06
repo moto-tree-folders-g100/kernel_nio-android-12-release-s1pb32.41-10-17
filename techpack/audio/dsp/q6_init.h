@@ -15,14 +15,7 @@ int audio_cal_init(void);
 int core_init(void);
 int rtac_init(void);
 int msm_audio_ion_init(void);
-#if IS_ENABLED(CONFIG_MSM_AVTIMER)
 int avtimer_init(void);
-#else
-static inline int avtimer_init(void)
-{
-	return 0;
-}
-#endif
 #ifdef CONFIG_MSM_MDF
 int msm_mdf_init(void);
 void msm_mdf_exit(void);
@@ -50,14 +43,7 @@ static inline void spk_params_exit(void)
 }
 #endif
 
-#if IS_ENABLED(CONFIG_MSM_AVTIMER)
 void avtimer_exit(void);
-#else
-static inline void avtimer_exit(void)
-{
-	return;
-}
-#endif
 void msm_audio_ion_exit(void);
 void rtac_exit(void);
 void core_exit(void);

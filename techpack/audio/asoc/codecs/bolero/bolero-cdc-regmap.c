@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/regmap.h>
@@ -224,7 +224,7 @@ static const struct reg_default bolero_defaults[] = {
 	{ BOLERO_CDC_RX_BCL_VBAT_PK_EST2, 0x01},
 	{ BOLERO_CDC_RX_BCL_VBAT_PK_EST3, 0x40},
 	{ BOLERO_CDC_RX_BCL_VBAT_RF_PROC1, 0x2A},
-	{ BOLERO_CDC_RX_BCL_VBAT_RF_PROC2, 0x00},
+	{ BOLERO_CDC_RX_BCL_VBAT_RF_PROC1, 0x00},
 	{ BOLERO_CDC_RX_BCL_VBAT_TAC1, 0x00},
 	{ BOLERO_CDC_RX_BCL_VBAT_TAC2, 0x18},
 	{ BOLERO_CDC_RX_BCL_VBAT_TAC3, 0x18},
@@ -805,8 +805,6 @@ static bool bolero_is_volatile_register(struct device *dev,
 	case BOLERO_CDC_TX_TOP_CSR_SWR_DMIC1_CTL:
 	case BOLERO_CDC_TX_TOP_CSR_SWR_DMIC2_CTL:
 	case BOLERO_CDC_TX_TOP_CSR_SWR_DMIC3_CTL:
-	case BOLERO_CDC_TX_TOP_CSR_SWR_MIC0_CTL:
-	case BOLERO_CDC_TX_TOP_CSR_SWR_MIC1_CTL:
 	case BOLERO_CDC_WSA_VBAT_BCL_VBAT_GAIN_MON_VAL:
 	case BOLERO_CDC_WSA_VBAT_BCL_VBAT_DECODE_ST:
 	case BOLERO_CDC_WSA_INTR_CTRL_PIN1_STATUS0:
@@ -854,10 +852,6 @@ static bool bolero_is_volatile_register(struct device *dev,
 	case BOLERO_CDC_RX_EC_ASRC2_STATUS_FMAX_CNTR_LSB:
 	case BOLERO_CDC_RX_EC_ASRC2_STATUS_FMAX_CNTR_MSB:
 	case BOLERO_CDC_RX_EC_ASRC2_STATUS_FIFO:
-	case BOLERO_CDC_RX_SIDETONE_IIR0_IIR_COEF_B1_CTL:
-	case BOLERO_CDC_RX_SIDETONE_IIR0_IIR_COEF_B2_CTL:
-	case BOLERO_CDC_RX_SIDETONE_IIR1_IIR_COEF_B1_CTL:
-	case BOLERO_CDC_RX_SIDETONE_IIR1_IIR_COEF_B2_CTL:
 		return true;
 	}
 	return false;

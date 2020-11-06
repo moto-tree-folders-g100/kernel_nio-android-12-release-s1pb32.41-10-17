@@ -9,100 +9,77 @@ endif
 ifeq ($(KERNEL_BUILD), 1)
 	# These are configurable via Kconfig for kernel-based builds
 	# Need to explicitly configure for Android-based builds
-	AUDIO_BLD_DIR := $(shell pwd)/kernel/msm-5.4
+	AUDIO_BLD_DIR := $(shell pwd)/kernel/msm-4.19
 	AUDIO_ROOT := $(AUDIO_BLD_DIR)/techpack/audio
 endif
 
-ifeq ($(CONFIG_SND_SOC_AUTO), y)
-	ifdef CONFIG_SND_SOC_SA8155
-		include $(AUDIO_ROOT)/config/sa8155auto.conf
-		export
-		INCS    +=  -include $(AUDIO_ROOT)/config/sa8155autoconf.h
-	endif
-	ifdef CONFIG_SND_SOC_SA6155
-		include $(AUDIO_ROOT)/config/sa6155auto.conf
-		export
-		INCS    +=  -include $(AUDIO_ROOT)/config/sa6155autoconf.h
-	endif
-	ifdef CONFIG_SND_SOC_GVM
-		include $(AUDIO_ROOT)/config/gvmauto.conf
-		export
-		INCS    +=  -include $(AUDIO_ROOT)/config/gvmautoconf.h
-	endif
-	ifdef CONFIG_SND_SOC_AR
-		include $(AUDIO_ROOT)/config/arauto.conf
-		export
-		INCS    +=  -include $(AUDIO_ROOT)/config/arautoconf.h
-	endif
-	ifdef CONFIG_SND_SOC_GVM_SA8295
-		include $(AUDIO_ROOT)/config/sa8295gvmauto.conf
-		export
-		INCS    +=  -include $(AUDIO_ROOT)/config/sa8295gvmautoconf.h
-	endif
-else
-	ifeq ($(KERNEL_BUILD), 0)
-		ifeq ($(CONFIG_ARCH_SM8150), y)
-			ifdef CONFIG_SND_SOC_SA8155
-				include $(AUDIO_ROOT)/config/sa8155auto.conf
-				export
-				INCS    +=  -include $(AUDIO_ROOT)/config/sa8155autoconf.h
-			else
-				include $(AUDIO_ROOT)/config/sm8150auto.conf
-				export
-				INCS    +=  -include $(AUDIO_ROOT)/config/sm8150autoconf.h
-			endif
+ifeq ($(KERNEL_BUILD), 0)
+	ifeq ($(CONFIG_ARCH_SM8150), y)
+		ifdef CONFIG_SND_SOC_SA8155
+			include $(AUDIO_ROOT)/config/sa8155auto.conf
+			export
+			INCS    +=  -include $(AUDIO_ROOT)/config/sa8155autoconf.h
+		else
+			include $(AUDIO_ROOT)/config/sm8150auto.conf
+			export
+			INCS    +=  -include $(AUDIO_ROOT)/config/sm8150autoconf.h
 		endif
-		ifeq ($(CONFIG_ARCH_SM6150), y)
-			ifdef CONFIG_SND_SOC_SA6155
-				include $(AUDIO_ROOT)/config/sa6155auto.conf
-				export
-				INCS    +=  -include $(AUDIO_ROOT)/config/sa6155autoconf.h
-			else
-				include $(AUDIO_ROOT)/config/sm6150auto.conf
-				export
-				INCS    +=  -include $(AUDIO_ROOT)/config/sm6150autoconf.h
-			endif
-		endif
-		ifeq ($(CONFIG_ARCH_TRINKET), y)
+	endif
+	ifeq ($(CONFIG_ARCH_SM6150), y)
+		ifdef CONFIG_SND_SOC_SA6155
+			include $(AUDIO_ROOT)/config/sa6155auto.conf
+			export
+			INCS    +=  -include $(AUDIO_ROOT)/config/sa6155autoconf.h
+		else
 			include $(AUDIO_ROOT)/config/sm6150auto.conf
 			export
 			INCS    +=  -include $(AUDIO_ROOT)/config/sm6150autoconf.h
 		endif
-		ifeq ($(CONFIG_ARCH_KONA), y)
-			include $(AUDIO_ROOT)/config/konaauto.conf
-			INCS    +=  -include $(AUDIO_ROOT)/config/konaautoconf.h
-		endif
-		ifeq ($(CONFIG_ARCH_LITO), y)
-			include $(AUDIO_ROOT)/config/litoauto.conf
+	endif
+	ifeq ($(CONFIG_ARCH_TRINKET), y)
+		include $(AUDIO_ROOT)/config/sm6150auto.conf
+		export
+		INCS    +=  -include $(AUDIO_ROOT)/config/sm6150autoconf.h
+	endif
+	ifeq ($(CONFIG_ARCH_KONA), y)
+		include $(AUDIO_ROOT)/config/konaauto.conf
+		INCS    +=  -include $(AUDIO_ROOT)/config/konaautoconf.h
+	endif
+	ifeq ($(CONFIG_ARCH_LITO), y)
+		include $(AUDIO_ROOT)/config/litoauto.conf
+		export
+		INCS    +=  -include $(AUDIO_ROOT)/config/litoautoconf.h
+	endif
+	ifeq ($(CONFIG_ARCH_BENGAL), y)
+		include $(AUDIO_ROOT)/config/bengalauto.conf
+		export
+		INCS    +=  -include $(AUDIO_ROOT)/config/bengalautoconf.h
+	endif
+	ifeq ($(CONFIG_ARCH_SDMSHRIKE), y)
+		ifdef CONFIG_SND_SOC_SA8155
+			include $(AUDIO_ROOT)/config/sa8155auto.conf
 			export
-			INCS    +=  -include $(AUDIO_ROOT)/config/litoautoconf.h
-		endif
-		ifeq ($(CONFIG_ARCH_BENGAL), y)
-			include $(AUDIO_ROOT)/config/bengalauto.conf
+			INCS    +=  -include $(AUDIO_ROOT)/config/sa8155autoconf.h
+		else
+			include $(AUDIO_ROOT)/config/sm8150auto.conf
 			export
-			INCS    +=  -include $(AUDIO_ROOT)/config/bengalautoconf.h
+			INCS    +=  -include $(AUDIO_ROOT)/config/sm8150autoconf.h
 		endif
-		ifeq ($(CONFIG_ARCH_SDMSHRIKE), y)
-			ifdef CONFIG_SND_SOC_SA8155
-				include $(AUDIO_ROOT)/config/sa8155auto.conf
-				export
-				INCS    +=  -include $(AUDIO_ROOT)/config/sa8155autoconf.h
-			else
-				include $(AUDIO_ROOT)/config/sm8150auto.conf
-				export
-				INCS    +=  -include $(AUDIO_ROOT)/config/sm8150autoconf.h
-			endif
-		endif
-		ifeq ($(CONFIG_ARCH_QCS405), y)
-			include $(AUDIO_ROOT)/config/qcs405auto.conf
-			export
-			INCS    +=  -include $(AUDIO_ROOT)/config/qcs405autoconf.h
-		endif
-		ifeq ($(CONFIG_QTI_QUIN_GVM), y)
-			include $(AUDIO_ROOT)/config/gvmauto.conf
-			export
-			INCS    +=  -include $(AUDIO_ROOT)/config/gvmautoconf.h
-		endif
+	endif
+	ifeq ($(CONFIG_ARCH_QCS405), y)
+		include $(AUDIO_ROOT)/config/qcs405auto.conf
+		export
+		INCS    +=  -include $(AUDIO_ROOT)/config/qcs405autoconf.h
+	endif
+	ifeq ($(CONFIG_QTI_GVM), y)
+		include $(AUDIO_ROOT)/config/gvmauto.conf
+		export
+		INCS    +=  -include $(AUDIO_ROOT)/config/gvmautoconf.h
+	endif
+	ifeq ($(CONFIG_ARCH_SDM660), y)
+		include $(AUDIO_ROOT)/config/sdm660auto.conf
+		export
+		INCS    +=  -include $(AUDIO_ROOT)/config/sdm660autoconf.h
 	endif
 endif
 
@@ -123,7 +100,7 @@ endif
 # config.
 
 ############ UAPI ############
-UAPI_DIR :=	uapi/audio
+UAPI_DIR :=	uapi
 UAPI_INC :=	-I$(AUDIO_ROOT)/include/$(UAPI_DIR)
 
 ############ COMMON ############
@@ -141,6 +118,7 @@ endif
 # for SM6150 sound card driver
 ifdef CONFIG_SND_SOC_SM6150
 	MACHINE_OBJS += sm6150.o
+	MACHINE_OBJS += machine_615x_init.o
 endif
 
 # For sa6155 sound card driver
@@ -155,21 +133,14 @@ endif
 
 # for KONA sound card driver
 ifdef CONFIG_SND_SOC_KONA
+ifeq ($(CONFIG_NIO_DTB), y)
+        MACHINE_OBJS += kona-awinic.o
+
+else ifeq ($(CONFIG_PSTAR_DTB), y)
+        MACHINE_OBJS += kona-awinic.o
+else
 	MACHINE_OBJS += kona.o
 endif
-
-# for LAHAINA sound card driver
-ifdef CONFIG_SND_SOC_LAHAINA
-	MACHINE_OBJS += lahaina.o
-endif
-
-ifdef CONFIG_SND_SOC_MDM9650
-	MACHINE_OBJS += sdx-target.o
-endif
-
-# for HOLI sound card driver
-ifdef CONFIG_SND_SOC_HOLI
-	MACHINE_OBJS += holi.o
 endif
 
 ifdef CONFIG_SND_SOC_LITO
@@ -186,14 +157,20 @@ ifdef CONFIG_SND_SOC_SA8155
 	MACHINE_OBJS += sa8155.o
 endif
 
-# for gvmgh sound card driver
-ifdef CONFIG_SND_SOC_GVM_AUTO_SPF
-    SPF_MACHINE_OBJS += gvm_auto_spf_dummy.o
+# for SDM6xx sound card driver
+ifdef CONFIG_SND_SOC_SDM660
+        MACHINE_OBJS += sdm660-common.o
 endif
 
-# for sa8295 sound card driver
-ifdef CONFIG_SND_SOC_SA8295
-	MACHINE_OBJS += sa8155.o
+# for SDM6xx sound card driver
+ifdef CONFIG_SND_SOC_INT_CODEC
+        MACHINE_OBJS += sdm660-internal.o
+endif
+
+# for SDM6xx sound card driver
+ifdef CONFIG_SND_SOC_EXT_CODEC
+        MACHINE_OBJS += sdm660-external.o
+        MACHINE_OBJS += sdm660-ext-dai-links.o
 endif
 
 ifdef CONFIG_SND_SOC_CPE
@@ -215,19 +192,11 @@ ifdef CONFIG_SND_SOC_QDSP6V2
 	PLATFORM_OBJS += msm-pcm-loopback-v2.o
 	PLATFORM_OBJS += msm-pcm-q6-noirq.o
 	PLATFORM_OBJS += msm-pcm-q6-v2.o
-	ifeq (y,$(findstring y,$(CONFIG_QTI_QUIN_GVM) $(CONFIG_PLATFORM_AUTO)))
-		PLATFORM_OBJS += msm-pcm-routing-auto.o
-	else
-		PLATFORM_OBJS += msm-pcm-routing-v2.o
-		PLATFORM_OBJS += msm-pcm-voice-v2.o
-		PLATFORM_OBJS += msm-pcm-voip-v2.o
-	endif
+	PLATFORM_OBJS += msm-pcm-routing-v2.o
+	PLATFORM_OBJS += msm-pcm-voice-v2.o
+	PLATFORM_OBJS += msm-pcm-voip-v2.o
 	PLATFORM_OBJS += msm-transcode-loopback-q6-v2.o
-	ifeq (y,$(findstring y,$(CONFIG_QTI_QUIN_GVM) $(CONFIG_PLATFORM_AUTO)))
-		PLATFORM_OBJS += platform_init_auto.o
-	else
-		PLATFORM_OBJS += platform_init.o
-	endif
+	PLATFORM_OBJS += platform_init.o
 endif
 ifdef CONFIG_WCD9XXX_CODEC_CORE
 	PLATFORM_OBJS += msm-dai-slim.o
@@ -259,16 +228,7 @@ CDEFINES +=	-DANI_LITTLE_BYTE_ENDIAN \
 		-DANI_OS_TYPE_ANDROID=6 \
 		-DPTT_SOCK_SVC_ENABLE \
 		-Wall\
-		-Werror\
 		-D__linux__
-
-ifeq ($(CONFIG_SND_PRI_MI2S_AW882XX), y)
-CDEFINES +=	-DCONFIG_PRI_MI2S_AW882XX
-endif
-
-ifeq ($(CONFIG_SND_ENABLE_QCOM_PMIC_HAPTIC), y)
-CDEFINES +=	-DCONFIG_SND_ENABLE_QCOM_PMIC_HAPTIC
-endif
 
 KBUILD_CPPFLAGS += $(CDEFINES)
 
@@ -285,11 +245,17 @@ ifeq ($(call cc-option-yn, -Wheader-guard),y)
 EXTRA_CFLAGS += -Wheader-guard
 endif
 
+ifeq ($(CONFIG_PSTAR_DTB), y)
+EXTRA_CFLAGS += -DCONFIG_AW882XX_I2C_NO3_BUS
+endif
+
 ifeq ($(KERNEL_BUILD), 0)
 KBUILD_EXTRA_SYMBOLS +=$(OUT)/obj/vendor/qcom/opensource/audio-kernel/dsp/Module.symvers
 KBUILD_EXTRA_SYMBOLS +=$(OUT)/obj/vendor/qcom/opensource/audio-kernel/asoc/codecs/Module.symvers
 KBUILD_EXTRA_SYMBOLS +=$(OUT)/obj/vendor/qcom/opensource/audio-kernel/asoc/codecs/wcd934x/Module.symvers
 KBUILD_EXTRA_SYMBOLS +=$(OUT)/obj/vendor/qcom/opensource/audio-kernel/asoc/codecs/wcd937x/Module.symvers
+KBUILD_EXTRA_SYMBOLS +=$(OUT)/obj/vendor/qcom/opensource/audio-kernel/asoc/codecs/sdm660_cdc/Module.symvers
+KBUILD_EXTRA_SYMBOLS +=$(OUT)/obj/vendor/qcom/opensource/audio-kernel/asoc/codecs/msm_sdw/Module.symvers
 endif
 ifeq ($(KERNEL_BUILD), 1)
 	obj-y += codecs/
@@ -313,15 +279,6 @@ machine_dlkm-y := $(MACHINE_OBJS)
 obj-$(CONFIG_SND_SOC_KONA) += machine_dlkm.o
 machine_dlkm-y := $(MACHINE_OBJS)
 
-obj-$(CONFIG_SND_SOC_LAHAINA) += machine_dlkm.o
-machine_dlkm-y := $(MACHINE_OBJS)
-
-obj-$(CONFIG_SND_SOC_MDM9650) += machine_dlkm.o
-machine_dlkm-y := $(MACHINE_OBJS)
-
-obj-$(CONFIG_SND_SOC_HOLI) += machine_dlkm.o
-machine_dlkm-y := $(MACHINE_OBJS)
-
 obj-$(CONFIG_SND_SOC_LITO) += machine_dlkm.o
 machine_dlkm-y := $(MACHINE_OBJS)
 
@@ -331,14 +288,11 @@ machine_dlkm-y := $(MACHINE_OBJS)
 obj-$(CONFIG_SND_SOC_SA8155) += machine_dlkm.o
 machine_dlkm-y := $(MACHINE_OBJS)
 
-obj-$(CONFIG_SND_SOC_SA8295) += machine_dlkm.o
+obj-$(CONFIG_SND_SOC_EXT_CODEC) += machine_dlkm.o
+machine_dlkm-y := $(MACHINE_OBJS)
+
+obj-$(CONFIG_SND_SOC_INT_CODEC) += machine_dlkm.o
 machine_dlkm-y := $(MACHINE_OBJS)
 
 obj-$(CONFIG_SND_SOC_CPE) += cpe_lsm_dlkm.o
 cpe_lsm_dlkm-y := $(CPE_LSM_OBJS)
-
-obj-$(CONFIG_SND_SOC_GVM_AUTO_SPF) += spf_machine_dlkm.o
-spf_machine_dlkm-y := $(SPF_MACHINE_OBJS)
-
-# inject some build related information
-DEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"

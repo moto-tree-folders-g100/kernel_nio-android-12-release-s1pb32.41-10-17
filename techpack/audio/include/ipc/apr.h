@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2010-2017, 2019-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2010-2017, 2019, The Linux Foundation. All rights reserved.
  */
 #ifndef __APR_H_
 #define __APR_H_
@@ -12,7 +12,6 @@ enum apr_subsys_state {
 	APR_SUBSYS_DOWN,
 	APR_SUBSYS_UP,
 	APR_SUBSYS_LOADED,
-	APR_SUBSYS_UNKNOWN,
 };
 
 struct apr_q6 {
@@ -20,13 +19,6 @@ struct apr_q6 {
 	atomic_t q6_state;
 	atomic_t modem_state;
 	struct mutex lock;
-/*
- * ToDo - Multiple client support to be added.
- * And checking for state UNKNOWN currently.
- */
-	void (*state_notify_cb)(enum apr_subsys_state state,
-				void *client_handle);
-	void *client_handle;
 };
 
 struct apr_hdr {
@@ -194,6 +186,4 @@ const char *apr_get_lpass_subsys_name(void);
 uint16_t apr_get_reset_domain(uint16_t proc);
 int apr_start_rx_rt(void *handle);
 int apr_end_rx_rt(void *handle);
-void apr_register_adsp_state_cb(void *adsp_cb, void *client_handle);
-int apr_pkt_config(void *handle, struct apr_pkt_cfg *cfg);
 #endif

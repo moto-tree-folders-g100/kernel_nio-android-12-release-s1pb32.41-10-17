@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -17,7 +17,7 @@
 #include <sound/pcm.h>
 #include <sound/initval.h>
 #include <sound/control.h>
-#include <audio/sound/audio_effects.h>
+#include <sound/audio_effects.h>
 #include <sound/pcm_params.h>
 #include <sound/timer.h>
 #include <sound/tlv.h>
@@ -43,6 +43,8 @@
 #define APP_TYPE_CONFIG_IDX_ACDB_ID 1
 #define APP_TYPE_CONFIG_IDX_SAMPLE_RATE 2
 #define APP_TYPE_CONFIG_IDX_BE_ID 3
+
+static DEFINE_MUTEX(transcode_loopback_session_lock);
 
 struct msm_transcode_audio_effects {
 	struct bass_boost_params bass_boost;
@@ -93,6 +95,9 @@ struct msm_transcode_loopback {
 
 	int session_id;
 	struct audio_client *audio_client;
+	uint32_t run_mode;
+	uint32_t start_delay_lsw;
+	uint32_t start_delay_msw;
 };
 
 /* Transcode loopback global info struct */
@@ -340,6 +345,7 @@ static int msm_transcode_loopback_free(struct snd_compr_stream *cstream)
 	}
 
 	trans->session_state = LOOPBACK_SESSION_CLOSE;
+	trans->run_mode = ASM_SESSION_CMD_RUN_STARTIME_RUN_IMMEDIATE;
 	mutex_unlock(&trans->lock);
 	return ret;
 }
@@ -358,7 +364,9 @@ static int msm_transcode_loopback_trigger(struct snd_compr_stream *cstream,
 		if (trans->session_state == LOOPBACK_SESSION_START) {
 			pr_debug("%s: Issue Loopback session %d RUN\n",
 				  __func__, trans->instance);
-			q6asm_run_nowait(trans->audio_client, 0, 0, 0);
+			q6asm_run_nowait(trans->audio_client, trans->run_mode,
+					 trans->start_delay_msw,
+					 trans->start_delay_lsw);
 			trans->session_state = LOOPBACK_SESSION_RUN;
 		}
 		break;
@@ -540,7 +548,6 @@ static int msm_transcode_loopback_set_params(struct snd_compr_stream *cstream,
 						loopback_event_handler);
 		trans->session_id = trans->audio_client->session;
 		trans->audio_client->perf_mode = trans->sink.perf_mode;
-		trans->audio_client->fedai_id = rtd->dai_link->id;
 		ret = q6asm_open_transcode_loopback(trans->audio_client,
 					bit_width,
 					trans->source.codec_format,
@@ -605,6 +612,42 @@ static int msm_transcode_loopback_get_caps(struct snd_compr_stream *cstream,
 	return 0;
 }
 
+static int msm_transcode_set_render_mode(struct msm_transcode_loopback *prtd,
+					 uint32_t render_mode, int dir)
+{
+	int ret = -EINVAL;
+	struct audio_client *ac = prtd->audio_client;
+
+	pr_debug("%s: got render mode %u\n", __func__, render_mode);
+
+	switch (render_mode) {
+	case SNDRV_COMPRESS_RENDER_MODE_AUDIO_MASTER:
+		render_mode = ASM_SESSION_MTMX_STRTR_PARAM_RENDER_DEFAULT;
+		break;
+	case SNDRV_COMPRESS_RENDER_MODE_STC_MASTER:
+		render_mode = ASM_SESSION_MTMX_STRTR_PARAM_RENDER_LOCAL_STC;
+		prtd->run_mode = ASM_SESSION_CMD_RUN_STARTIME_RUN_WITH_DELAY;
+		break;
+	case SNDRV_COMPRESS_RENDER_MODE_TTP:
+		render_mode = ASM_SESSION_MTMX_STRTR_PARAM_RENDER_LOCAL_STC;
+		prtd->run_mode = ASM_SESSION_CMD_RUN_STARTIME_RUN_WITH_TTP;
+		break;
+	default:
+		pr_err("%s: Invalid render mode %u\n", __func__,
+			render_mode);
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	ret = q6asm_send_mtmx_strtr_render_mode(ac, render_mode, dir);
+	if (ret) {
+		pr_err("%s: Render mode can't be set error %d\n", __func__,
+			ret);
+	}
+exit:
+	return ret;
+}
+
 static int msm_transcode_loopback_set_metadata(struct snd_compr_stream *cstream,
 				struct snd_compr_metadata *metadata)
 {
@@ -613,6 +656,7 @@ static int msm_transcode_loopback_set_metadata(struct snd_compr_stream *cstream,
 	struct msm_transcode_loopback *prtd = NULL;
 	struct snd_soc_component *component;
 	struct audio_client *ac = NULL;
+	int rc = 0;
 
 	if (!metadata || !cstream) {
 		pr_err("%s: Invalid arguments\n", __func__);
@@ -659,6 +703,21 @@ static int msm_transcode_loopback_set_metadata(struct snd_compr_stream *cstream,
 		}
 		break;
 	}
+	case SNDRV_COMPRESS_RENDER_MODE:
+	{
+		rc = msm_transcode_set_render_mode(prtd, metadata->value[0],
+						   cstream->direction);
+		if (rc)
+			pr_err("%s: error setting render mode %d\n", __func__,
+				rc);
+		break;
+	}
+	case SNDRV_COMPRESS_START_DELAY:
+	{
+		prtd->start_delay_lsw = metadata->value[0];
+		prtd->start_delay_msw = metadata->value[1];
+		break;
+	}
 	case SNDRV_COMPRESS_RENDER_WINDOW:
 	{
 		return msm_transcode_set_render_window(
@@ -673,7 +732,7 @@ static int msm_transcode_loopback_set_metadata(struct snd_compr_stream *cstream,
 				__func__, metadata->key);
 		break;
 	}
-	return 0;
+	return rc;
 }
 
 static int msm_transcode_stream_cmd_put(struct snd_kcontrol *kcontrol,
@@ -1210,7 +1269,7 @@ static int msm_transcode_add_audio_effects_control(struct snd_soc_pcm_runtime *r
 
 	pr_debug("%s: added new compr FE with name %s, id %d, cpu dai %s, device no %d\n", __func__,
 						rtd->dai_link->name, rtd->dai_link->id,
-						rtd->dai_link->cpus->dai_name, rtd->pcm->device);
+						rtd->dai_link->cpu_dai_name, rtd->pcm->device);
 
 	ctl_len = strlen(mixer_ctl_name) + 1 + strlen(deviceNo) + 1;
 	mixer_str = kzalloc(ctl_len, GFP_KERNEL);

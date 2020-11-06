@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2012-2014, 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, 2017-2020, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -16,7 +16,6 @@
 #include <linux/workqueue.h>
 #include <linux/nvmem-consumer.h>
 #include <linux/slab.h>
-#include <soc/qcom/boot_stats.h>
 #include <soc/qcom/subsystem_restart.h>
 
 #define Q6_PIL_GET_DELAY_MS 100
@@ -24,7 +23,6 @@
 #define SSR_RESET_CMD 1
 #define IMAGE_UNLOAD_CMD 0
 #define MAX_FW_IMAGES 4
-#define BOOT_FOR_EARLY_CHIME_CMD 2
 
 static ssize_t adsp_boot_store(struct kobject *kobj,
 	struct kobj_attribute *attr,
@@ -57,51 +55,6 @@ static struct work_struct adsp_ldr_work;
 static struct platform_device *adsp_private;
 static void adsp_loader_unload(struct platform_device *pdev);
 
-static int adsp_restart_subsys(void)
-{
-	struct subsys_device *adsp_dev = NULL;
-	struct platform_device *pdev = adsp_private;
-	struct adsp_loader_private *priv = NULL;
-	int rc = -EINVAL;
-
-	priv = platform_get_drvdata(pdev);
-	if (!priv)
-		return rc;
-
-	adsp_dev = (struct subsys_device *)priv->pil_h;
-	if (!adsp_dev)
-		return rc;
-
-	/* subsystem_restart_dev has worker queue to handle */
-	rc = subsystem_restart_dev(adsp_dev);
-	if (rc) {
-		dev_err(&pdev->dev, "subsystem_restart_dev failed\n");
-		return rc;
-	}
-	pr_debug("%s :: Restart Success %d\n", __func__, rc);
-	return rc;
-}
-
-static void adsp_load_state_notify_cb(enum apr_subsys_state state,
-						void *phandle)
-{
-	struct platform_device *pdev = adsp_private;
-	struct adsp_loader_private *priv = NULL;
-
-	priv = platform_get_drvdata(pdev);
-	if (!priv)
-		return;
-	if (phandle != adsp_private) {
-		pr_err("%s:callback is not for adsp-loader client\n", __func__);
-		return;
-	}
-	pr_debug("%s:: Received cb for ADSP restart\n", __func__);
-	if (state == APR_SUBSYS_UNKNOWN)
-		adsp_restart_subsys();
-	else
-		pr_debug("%s:Ignore restart request for ADSP", __func__);
-}
-
 static void adsp_load_fw(struct work_struct *adsp_ldr_work)
 {
 	struct platform_device *pdev = adsp_private;
@@ -110,7 +63,6 @@ static void adsp_load_fw(struct work_struct *adsp_ldr_work)
 	int rc = 0;
 	u32 adsp_state;
 	const char *img_name;
-	void *padsp_restart_cb = &adsp_load_state_notify_cb;
 
 	if (!pdev) {
 		dev_err(&pdev->dev, "%s: Platform device null\n", __func__);
@@ -167,14 +119,13 @@ static void adsp_load_fw(struct work_struct *adsp_ldr_work)
 		}
 
 		dev_dbg(&pdev->dev, "%s: Q6/MDSP image is loaded\n", __func__);
-		goto success;
+		return;
 	}
 
 load_adsp:
 	{
 		adsp_state = apr_get_q6_state();
 		if (adsp_state == APR_SUBSYS_DOWN) {
-			place_marker("M - Start ADSP");
 			priv = platform_get_drvdata(pdev);
 			if (!priv) {
 				dev_err(&pdev->dev,
@@ -202,13 +153,10 @@ load_adsp:
 		}
 
 		dev_dbg(&pdev->dev, "%s: Q6/ADSP image is loaded\n", __func__);
-		apr_register_adsp_state_cb(padsp_restart_cb, adsp_private);
-		goto success;
+		return;
 	}
 fail:
 	dev_err(&pdev->dev, "%s: Q6 image loading failed\n", __func__);
-success:
-	return;
 }
 
 static void adsp_loader_do(struct platform_device *pdev)
@@ -222,15 +170,12 @@ static ssize_t adsp_ssr_store(struct kobject *kobj,
 	size_t count)
 {
 	int ssr_command = 0;
+	struct subsys_device *adsp_dev = NULL;
 	struct platform_device *pdev = adsp_private;
 	struct adsp_loader_private *priv = NULL;
-	int rc = -EINVAL;
+	int rc;
 
 	dev_dbg(&pdev->dev, "%s: going to call adsp ssr\n ", __func__);
-
-	priv = platform_get_drvdata(pdev);
-	if (!priv)
-		return rc;
 
 	if (kstrtoint(buf, 10, &ssr_command) < 0)
 		return -EINVAL;
@@ -238,8 +183,24 @@ static ssize_t adsp_ssr_store(struct kobject *kobj,
 	if (ssr_command != SSR_RESET_CMD)
 		return -EINVAL;
 
-	adsp_restart_subsys();
-	dev_dbg(&pdev->dev, "%s :: ADSP restarted\n", __func__);
+	priv = platform_get_drvdata(pdev);
+	if (!priv)
+		return -EINVAL;
+
+	adsp_dev = (struct subsys_device *)priv->pil_h;
+	if (!adsp_dev)
+		return -EINVAL;
+
+	dev_err(&pdev->dev, "requesting for ADSP restart\n");
+
+	/* subsystem_restart_dev has worker queue to handle */
+	rc = subsystem_restart_dev(adsp_dev);
+	if (rc) {
+		dev_err(&pdev->dev, "subsystem_restart_dev failed\n");
+		return rc;
+	}
+
+	dev_dbg(&pdev->dev, "ADSP restarted\n");
 	return count;
 }
 
@@ -261,11 +222,7 @@ static ssize_t adsp_boot_store(struct kobject *kobj,
 	} else if (boot == IMAGE_UNLOAD_CMD) {
 		pr_debug("%s: going to call adsp_unloader\n", __func__);
 		adsp_loader_unload(adsp_private);
-	} else if (boot == BOOT_FOR_EARLY_CHIME_CMD) {
-		pr_debug("%s: going to call adsp_load_fw\n", __func__);
-		adsp_load_fw(NULL);
 	}
-
 	return count;
 }
 
@@ -436,7 +393,7 @@ static int adsp_loader_probe(struct platform_device *pdev)
 		goto wqueue;
 	}
 	if (len <= 0 || len > sizeof(u32)) {
-		dev_dbg(&pdev->dev, "%s: nvmem cell length out of range: %d\n",
+		dev_dbg(&pdev->dev, "%s: nvmem cell length out of range: %zu\n",
 			__func__, len);
 		kfree(buf);
 		goto wqueue;

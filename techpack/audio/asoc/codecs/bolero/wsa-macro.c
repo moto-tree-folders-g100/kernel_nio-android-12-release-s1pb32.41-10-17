@@ -142,7 +142,6 @@ static struct interp_sample_rate int_mix_sample_rate_val[] = {
 
 #define WSA_MACRO_SWR_STRING_LEN 80
 
-static int wsa_macro_core_vote(void *handle, bool enable);
 static int wsa_macro_hw_params(struct snd_pcm_substream *substream,
 			       struct snd_pcm_hw_params *params,
 			       struct snd_soc_dai *dai);
@@ -235,7 +234,6 @@ struct wsa_macro_priv {
 			[WSA_MACRO_CHILD_DEVICES_MAX];
 	int child_count;
 	int ear_spkr_gain;
-	int wsa_spkrrecv;
 	int spkr_gain_offset;
 	int spkr_mode;
 	int is_softclip_on[WSA_MACRO_SOFTCLIP_MAX];
@@ -294,11 +292,6 @@ static const struct snd_kcontrol_new wsa_int1_vbat_mix_switch[] = {
 	SOC_DAPM_SINGLE("WSA RX1 VBAT Enable", SND_SOC_NOPM, 0, 1, 0)
 };
 
-static const char *const wsa_macro_ear_spkrrecv_text[] = {
-	"OFF", "ON"
-};
-static SOC_ENUM_SINGLE_EXT_DECL(wsa_macro_ear_spkrrecv_enum,
-				wsa_macro_ear_spkrrecv_text);
 static SOC_ENUM_SINGLE_EXT_DECL(wsa_macro_ear_spkr_pa_gain_enum,
 				wsa_macro_ear_spkr_pa_gain_text);
 static SOC_ENUM_SINGLE_EXT_DECL(wsa_macro_spkr_boost_stage_enum,
@@ -452,8 +445,8 @@ static struct snd_soc_dai_driver wsa_macro_dai[] = {
 static const struct wsa_macro_reg_mask_val wsa_macro_spkr_default[] = {
 	{BOLERO_CDC_WSA_COMPANDER0_CTL3, 0x80, 0x80},
 	{BOLERO_CDC_WSA_COMPANDER1_CTL3, 0x80, 0x80},
-	{BOLERO_CDC_WSA_COMPANDER0_CTL7, 0x01, 0x01},
-	{BOLERO_CDC_WSA_COMPANDER1_CTL7, 0x01, 0x01},
+	{BOLERO_CDC_WSA_COMPANDER0_CTL7, 0x1F, 0x19},
+	{BOLERO_CDC_WSA_COMPANDER1_CTL7, 0x1F, 0x19},
 	{BOLERO_CDC_WSA_BOOST0_BOOST_CTL, 0x7C, 0x58},
 	{BOLERO_CDC_WSA_BOOST1_BOOST_CTL, 0x7C, 0x58},
 };
@@ -461,8 +454,8 @@ static const struct wsa_macro_reg_mask_val wsa_macro_spkr_default[] = {
 static const struct wsa_macro_reg_mask_val wsa_macro_spkr_mode1[] = {
 	{BOLERO_CDC_WSA_COMPANDER0_CTL3, 0x80, 0x00},
 	{BOLERO_CDC_WSA_COMPANDER1_CTL3, 0x80, 0x00},
-	{BOLERO_CDC_WSA_COMPANDER0_CTL7, 0x01, 0x00},
-	{BOLERO_CDC_WSA_COMPANDER1_CTL7, 0x01, 0x00},
+	{BOLERO_CDC_WSA_COMPANDER0_CTL7, 0x1F, 0x18},
+	{BOLERO_CDC_WSA_COMPANDER1_CTL7, 0x1F, 0x18},
 	{BOLERO_CDC_WSA_BOOST0_BOOST_CTL, 0x7C, 0x44},
 	{BOLERO_CDC_WSA_BOOST1_BOOST_CTL, 0x7C, 0x44},
 };
@@ -1032,7 +1025,6 @@ static int wsa_macro_event_handler(struct snd_soc_component *component,
 		break;
 	case BOLERO_MACRO_EVT_PRE_SSR_UP:
 		/* enable&disable WSA_CORE_CLK to reset GFMUX reg */
-		wsa_macro_core_vote(wsa_priv, true);
 		ret = bolero_clk_rsc_request_clock(wsa_priv->dev,
 						wsa_priv->default_clk_id,
 						WSA_CORE_CLK, true);
@@ -1044,7 +1036,6 @@ static int wsa_macro_event_handler(struct snd_soc_component *component,
 			bolero_clk_rsc_request_clock(wsa_priv->dev,
 						wsa_priv->default_clk_id,
 						WSA_CORE_CLK, false);
-		wsa_macro_core_vote(wsa_priv, false);
 		break;
 	case BOLERO_MACRO_EVT_SSR_UP:
 		trace_printk("%s, enter SSR up\n", __func__);
@@ -1711,14 +1702,6 @@ static int wsa_macro_config_ear_spkr_gain(struct snd_soc_component *component,
 			dev_dbg(wsa_priv->dev, "%s: RX0 Volume %d dB\n",
 				__func__, val);
 		}
-		if(wsa_priv->wsa_spkrrecv) {
-			snd_soc_component_update_bits(component,
-				BOLERO_CDC_WSA_COMPANDER0_CTL7, 0x01, 0x00);
-			snd_soc_component_update_bits(component,
-				BOLERO_CDC_WSA_COMPANDER0_CTL3, 0x80, 0x80);
-			snd_soc_component_update_bits(component,
-				BOLERO_CDC_WSA_RX0_RX_PATH_CFG1, 0x08, 0x00);
-		}
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		/*
@@ -1733,12 +1716,6 @@ static int wsa_macro_config_ear_spkr_gain(struct snd_soc_component *component,
 			dev_dbg(wsa_priv->dev, "%s: Reset RX0 Volume to 0 dB\n",
 				__func__);
 		}
-		snd_soc_component_update_bits(component,
-				BOLERO_CDC_WSA_RX0_RX_PATH_CFG1, 0x08, 0x08);
-		snd_soc_component_update_bits(component,
-				BOLERO_CDC_WSA_COMPANDER0_CTL7, 0x01, 0x01);
-		snd_soc_component_update_bits(component,
-				BOLERO_CDC_WSA_COMPANDER0_CTL3, 0x80, 0x00);
 		break;
 	}
 
@@ -2034,12 +2011,10 @@ static int wsa_macro_set_rx_mute_status(struct snd_kcontrol *kcontrol,
 	int value = ucontrol->value.integer.value[0];
 	int wsa_rx_shift = ((struct soc_multi_mixer_control *)
 			kcontrol->private_value)->shift;
-	int ret = 0;
 
 	if (!wsa_macro_get_data(component, &wsa_dev, &wsa_priv, __func__))
 		return -EINVAL;
 
-	pm_runtime_get_sync(wsa_priv->dev);
 	switch (wsa_rx_shift) {
 	case 0:
 		snd_soc_component_update_bits(component,
@@ -2064,16 +2039,13 @@ static int wsa_macro_set_rx_mute_status(struct snd_kcontrol *kcontrol,
 	default:
 		pr_err("%s: invalid argument rx_shift = %d\n", __func__,
 			wsa_rx_shift);
-		ret = -EINVAL;
+		return -EINVAL;
 	}
-	pm_runtime_mark_last_busy(wsa_priv->dev);
-	pm_runtime_put_autosuspend(wsa_priv->dev);
 
 	dev_dbg(component->dev, "%s: WSA Digital Mute RX %d Enable %d\n",
 		__func__, wsa_rx_shift, value);
 	wsa_priv->wsa_digital_mute_status[wsa_rx_shift] = value;
-
-	return ret;
+	return 0;
 }
 
 static int wsa_macro_get_compander(struct snd_kcontrol *kcontrol,
@@ -2113,43 +2085,6 @@ static int wsa_macro_set_compander(struct snd_kcontrol *kcontrol,
 	wsa_priv->comp_enabled[comp] = value;
 
 	return 0;
-}
-
-static int wsa_macro_ear_spkrrecv_get(struct snd_kcontrol *kcontrol,
-				 struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
-	struct device *wsa_dev = NULL;
-	struct wsa_macro_priv *wsa_priv = NULL;
-
-	if (!wsa_macro_get_data(component, &wsa_dev, &wsa_priv, __func__))
-		return -EINVAL;
-
-	ucontrol->value.integer.value[0] = wsa_priv->wsa_spkrrecv;
-
-	dev_dbg(component->dev, "%s: ucontrol->value.integer.value[0] = %ld\n",
-		 __func__, ucontrol->value.integer.value[0]);
-
-	return 0;
-}
-
-static int wsa_macro_ear_spkrrecv_put(struct snd_kcontrol *kcontrol,
-                                        struct snd_ctl_elem_value *ucontrol)
-{
-        struct snd_soc_component *component =
-                                snd_soc_kcontrol_component(kcontrol);
-        struct device *wsa_dev = NULL;
-        struct wsa_macro_priv *wsa_priv = NULL;
-
-        if (!wsa_macro_get_data(component, &wsa_dev, &wsa_priv, __func__))
-                return -EINVAL;
-        wsa_priv->wsa_spkrrecv = ucontrol->value.integer.value[0];
-
-        dev_dbg(component->dev, "%s:spkrrecv status = %d\n",
-                 __func__, wsa_priv->wsa_spkrrecv);
-
-        return 0;
 }
 
 static int wsa_macro_ear_spkr_pa_gain_get(struct snd_kcontrol *kcontrol,
@@ -2417,9 +2352,6 @@ static int wsa_macro_soft_clip_enable_put(struct snd_kcontrol *kcontrol,
 }
 
 static const struct snd_kcontrol_new wsa_macro_snd_controls[] = {
-	SOC_ENUM_EXT("WSA SPKRRECV", wsa_macro_ear_spkrrecv_enum,
-			wsa_macro_ear_spkrrecv_get,
-			wsa_macro_ear_spkrrecv_put),
 	SOC_ENUM_EXT("EAR SPKR PA Gain", wsa_macro_ear_spkr_pa_gain_enum,
 		     wsa_macro_ear_spkr_pa_gain_get,
 		     wsa_macro_ear_spkr_pa_gain_put),
@@ -2442,12 +2374,12 @@ static const struct snd_kcontrol_new wsa_macro_snd_controls[] = {
 			WSA_MACRO_SOFTCLIP1, 1, 0,
 			wsa_macro_soft_clip_enable_get,
 			wsa_macro_soft_clip_enable_put),
-	SOC_SINGLE_S8_TLV("WSA_RX0 Digital Volume",
+	SOC_SINGLE_SX_TLV("WSA_RX0 Digital Volume",
 			  BOLERO_CDC_WSA_RX0_RX_VOL_CTL,
-			  -84, 40, digital_gain),
-	SOC_SINGLE_S8_TLV("WSA_RX1 Digital Volume",
+			  0, -84, 40, digital_gain),
+	SOC_SINGLE_SX_TLV("WSA_RX1 Digital Volume",
 			  BOLERO_CDC_WSA_RX1_RX_VOL_CTL,
-			  -84, 40, digital_gain),
+			  0, -84, 40, digital_gain),
 	SOC_SINGLE_EXT("WSA_RX0 Digital Mute", SND_SOC_NOPM, WSA_MACRO_RX0, 1,
 			0, wsa_macro_get_rx_mute_status,
 			wsa_macro_set_rx_mute_status),
@@ -2812,10 +2744,10 @@ static const struct snd_soc_dapm_route wsa_audio_map[] = {
 static const struct wsa_macro_reg_mask_val wsa_macro_reg_init[] = {
 	{BOLERO_CDC_WSA_BOOST0_BOOST_CFG1, 0x3F, 0x12},
 	{BOLERO_CDC_WSA_BOOST0_BOOST_CFG2, 0x1C, 0x08},
-	{BOLERO_CDC_WSA_COMPANDER0_CTL7, 0x1E, 0x18},
+	{BOLERO_CDC_WSA_COMPANDER0_CTL7, 0x1E, 0x0C},
 	{BOLERO_CDC_WSA_BOOST1_BOOST_CFG1, 0x3F, 0x12},
 	{BOLERO_CDC_WSA_BOOST1_BOOST_CFG2, 0x1C, 0x08},
-	{BOLERO_CDC_WSA_COMPANDER1_CTL7, 0x1E, 0x18},
+	{BOLERO_CDC_WSA_COMPANDER1_CTL7, 0x1E, 0x0C},
 	{BOLERO_CDC_WSA_BOOST0_BOOST_CTL, 0x70, 0x58},
 	{BOLERO_CDC_WSA_BOOST1_BOOST_CTL, 0x70, 0x58},
 	{BOLERO_CDC_WSA_RX0_RX_PATH_CFG1, 0x08, 0x08},
@@ -3146,23 +3078,6 @@ static void wsa_macro_add_child_devices(struct work_struct *work)
 					__func__, ctrl_num);
 				goto fail_pdev_add;
 			}
-
-			temp = krealloc(swr_ctrl_data,
-					(ctrl_num + 1) * sizeof(
-					struct wsa_macro_swr_ctrl_data),
-					GFP_KERNEL);
-			if (!temp) {
-				dev_err(&pdev->dev, "out of memory\n");
-				ret = -ENOMEM;
-				goto fail_pdev_add;
-			}
-			swr_ctrl_data = temp;
-			swr_ctrl_data[ctrl_num].wsa_swr_pdev = pdev;
-			ctrl_num++;
-			dev_dbg(&pdev->dev,
-				"%s: Adding soundwire ctrl device(s)\n",
-				__func__);
-			wsa_priv->swr_ctrl_data = swr_ctrl_data;
 		}
 
 		ret = platform_device_add(pdev);
@@ -3173,6 +3088,24 @@ static void wsa_macro_add_child_devices(struct work_struct *work)
 			goto fail_pdev_add;
 		}
 
+		if (!strcmp(node->name, "wsa_swr_master")) {
+			temp = krealloc(swr_ctrl_data,
+					(ctrl_num + 1) * sizeof(
+					struct wsa_macro_swr_ctrl_data),
+					GFP_KERNEL);
+			if (!temp) {
+				dev_err(&pdev->dev, "out of memory\n");
+				ret = -ENOMEM;
+				goto err;
+			}
+			swr_ctrl_data = temp;
+			swr_ctrl_data[ctrl_num].wsa_swr_pdev = pdev;
+			ctrl_num++;
+			dev_dbg(&pdev->dev,
+				"%s: Added soundwire ctrl device(s)\n",
+				__func__);
+			wsa_priv->swr_ctrl_data = swr_ctrl_data;
+		}
 		if (wsa_priv->child_count < WSA_MACRO_CHILD_DEVICES_MAX)
 			wsa_priv->pdev_child_devices[
 					wsa_priv->child_count++] = pdev;
@@ -3255,8 +3188,6 @@ static int wsa_macro_probe(struct platform_device *pdev)
 			__func__);
 		return -EPROBE_DEFER;
 	}
-	msm_cdc_pinctrl_set_wakeup_capable(
-				wsa_priv->wsa_swr_gpio_p, false);
 
 	wsa_io_base = devm_ioremap(&pdev->dev,
 				   wsa_base_addr, WSA_MACRO_MAX_OFFSET);

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2013-2021, Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2020, Linux Foundation. All rights reserved.
  */
 #include <linux/fs.h>
 #include <linux/mutex.h>
@@ -15,7 +15,7 @@
 #include <linux/debugfs.h>
 #include <linux/time.h>
 #include <linux/atomic.h>
-#include <audio/sound/lsm_params.h>
+#include <sound/lsm_params.h>
 #include <asm/ioctls.h>
 #include <linux/memory.h>
 #include <dsp/msm_audio_ion.h>
@@ -63,12 +63,6 @@ struct lsm_common {
 	struct cal_type_data	*cal_data[LSM_MAX_CAL_IDX];
 
 	struct mutex apr_lock;
-
-#ifdef CONFIG_DEBUG_FS
-	/* Debugfs related */
-	struct dentry *entry;
-	bool panic_on_timeout;
-#endif
 };
 
 static struct lsm_common lsm_common;
@@ -514,13 +508,6 @@ static int q6lsm_apr_send_pkt(struct lsm_client *client, void *handle,
 				__func__, msg_hdr->opcode, msg_hdr->pkt_size);
 			/* ret = 0 means wait timed out */
 			ret = -ETIMEDOUT;
-#ifdef CONFIG_DEBUG_FS
-			/*
-			 * If panic_on_timeout flag is explicitly set through the debugfs,
-			 * then trigger a device crash here to aid debugging.
-			 */
-			BUG_ON(lsm_common.panic_on_timeout);
-#endif
 		}
 	} else {
 		ret = 0;
@@ -1038,23 +1025,23 @@ done:
  * @client: LSM client handle
  * @p_info: param info
  * @offset: pointer to retrieve size
- * @sm: pointer to sound model
+ *
  */
 void q6lsm_sm_set_param_data(struct lsm_client *client,
-			     struct lsm_params_info_v2 *p_info,
-			     size_t *offset, struct lsm_sound_model *sm)
+		struct lsm_params_info_v2 *p_info,
+		size_t *offset)
 {
 	struct param_hdr_v3 param_hdr;
 	int ret;
+	struct lsm_sound_model *sm;
 
+	sm = &client->stage_cfg[p_info->stage_idx].sound_model;
 	memset(&param_hdr, 0, sizeof(param_hdr));
 
 	param_hdr.module_id = p_info->module_id;
 	param_hdr.instance_id = p_info->instance_id;
 	param_hdr.param_id = p_info->param_id;
 	param_hdr.param_size = p_info->param_size;
-
-	sm->model_id = p_info->model_id;
 
 	ret = q6lsm_pack_params(sm->data, &param_hdr,
 				NULL, offset, LSM_SESSION_CMD_SET_PARAMS_V2);
@@ -1140,78 +1127,42 @@ EXPORT_SYMBOL(q6lsm_open);
 
 static int q6lsm_send_confidence_levels(struct lsm_client *client,
 					struct param_hdr_v3 *param_info,
-					uint32_t set_param_opcode, uint32_t model_id)
+					uint32_t set_param_opcode)
 {
 	struct lsm_param_confidence_levels *conf_levels = NULL;
 	uint32_t num_conf_levels = client->num_confidence_levels;
-	struct lsm_param_multi_snd_model_conf_levels *multi_sm_conf_levels = NULL;
-	uint32_t num_keywords = client->num_keywords;
 	uint8_t i = 0;
 	uint8_t padd_size = 0;
 	uint32_t param_size = 0;
 	int rc = 0;
 
-	if (model_id != 0) {
-		/* No padding is need since the structure is always 4 byte aligend.
-		 * The number "2" below represents the first two u32 variables in
-		 * struct lsm_param_multi_snd_model_conf_levels.
-		 */
-		param_size = (2 + num_keywords) * sizeof(uint32_t);
-		param_info->param_size = param_size;
-		pr_debug("%s: Set Conf Levels PARAM SIZE: %d\n", __func__, param_size);
+	/* Data must be 4 byte aligned so add any necessary padding. */
+	padd_size = (4 - (num_conf_levels % 4)) - 1;
+	param_size = (sizeof(uint8_t) + num_conf_levels + padd_size) *
+		     sizeof(uint8_t);
+	param_info->param_size = param_size;
+	pr_debug("%s: Set Conf Levels PARAM SIZE = %d\n", __func__, param_size);
 
-		multi_sm_conf_levels = kzalloc(param_size, GFP_KERNEL);
-		if (!multi_sm_conf_levels)
-			return -ENOMEM;
+	conf_levels = kzalloc(param_size, GFP_KERNEL);
+	if (!conf_levels)
+		return -ENOMEM;
 
-		multi_sm_conf_levels->model_id = model_id;
-		multi_sm_conf_levels->num_keywords = num_keywords;
-		pr_debug("%s: snd_model id: %d, num_keywords: %d\n",
-			 __func__, model_id, num_keywords);
+	conf_levels->num_confidence_levels = num_conf_levels;
+	pr_debug("%s: Num conf_level = %d\n", __func__, num_conf_levels);
 
-		memcpy(multi_sm_conf_levels->confidence_levels,
-		       client->multi_snd_model_confidence_levels,
-		       sizeof(uint32_t) * num_keywords);
-		for (i = 0; i < num_keywords; i++)
-			pr_debug("%s: Confidence_level[%d] = %d\n", __func__, i,
-				 multi_sm_conf_levels->confidence_levels[i]);
+	memcpy(conf_levels->confidence_levels, client->confidence_levels,
+	       num_conf_levels);
+	for (i = 0; i < num_conf_levels; i++)
+		pr_debug("%s: Confidence_level[%d] = %d\n", __func__, i,
+			 conf_levels->confidence_levels[i]);
 
-		rc = q6lsm_pack_and_set_params(client, param_info,
-					       (uint8_t *) multi_sm_conf_levels,
-					       set_param_opcode);
-		if (rc)
-			pr_err("%s: Send multi_snd_model_conf_levels cmd failed, err %d\n",
-			       __func__, rc);
-		kfree(multi_sm_conf_levels);
-	} else {
-		/* Data must be 4 byte aligned so add any necessary padding. */
-		padd_size = (4 - (num_conf_levels % 4)) - 1;
-		param_size = (sizeof(uint8_t) + num_conf_levels + padd_size) *
-			      sizeof(uint8_t);
-		param_info->param_size = param_size;
-		pr_debug("%s: Set Conf Levels PARAM SIZE = %d\n", __func__, param_size);
-
-		conf_levels = kzalloc(param_size, GFP_KERNEL);
-		if (!conf_levels)
-			return -ENOMEM;
-
-		conf_levels->num_confidence_levels = num_conf_levels;
-		pr_debug("%s: Num conf_level = %d\n", __func__, num_conf_levels);
-
-		memcpy(conf_levels->confidence_levels, client->confidence_levels,
-		       num_conf_levels);
-		for (i = 0; i < num_conf_levels; i++)
-			pr_debug("%s: Confidence_level[%d] = %d\n", __func__, i,
-				 conf_levels->confidence_levels[i]);
-
-		rc = q6lsm_pack_and_set_params(client, param_info,
-					       (uint8_t *) conf_levels,
-					       set_param_opcode);
-		if (rc)
-			pr_err("%s: Send confidence_levels cmd failed, err = %d\n",
-			       __func__, rc);
-		kfree(conf_levels);
-	}
+	rc = q6lsm_pack_and_set_params(client, param_info,
+				       (uint8_t *) conf_levels,
+				       set_param_opcode);
+	if (rc)
+		pr_err("%s: Send confidence_levels cmd failed, err = %d\n",
+		       __func__, rc);
+	kfree(conf_levels);
 	return rc;
 }
 
@@ -1265,7 +1216,7 @@ int get_lsm_port(void)
  */
 int q6lsm_set_afe_data_format(uint64_t fe_id, uint16_t afe_data_format)
 {
-	int n = 0, free_session = LSM_INVALID_SESSION_ID;
+	int n = 0;
 
 	if (0 != afe_data_format && 1 != afe_data_format)
 		goto done;
@@ -1274,31 +1225,14 @@ int q6lsm_set_afe_data_format(uint64_t fe_id, uint16_t afe_data_format)
 		 afe_data_format ? "unprocessed" : "processed");
 
 	for (n = LSM_MIN_SESSION_ID; n <= LSM_MAX_SESSION_ID; n++) {
-		/* Save ID of the first available free session */
-		if (LSM_INVALID_SESSION_ID == free_session &&
-		    0 == lsm_client_afe_data[n].fe_id)
-			free_session = n;
-
-		/* Find the matching session with fe_id */
-		if (fe_id == lsm_client_afe_data[n].fe_id) {
+		if (0 == lsm_client_afe_data[n].fe_id) {
+			lsm_client_afe_data[n].fe_id = fe_id;
 			lsm_client_afe_data[n].unprocessed_data =
 							afe_data_format;
-			pr_debug("%s: session ID is %d, fe_id is %d\n",
+			pr_debug("%s: session ID is %d, fe_id is %llu\n",
 				 __func__, n, fe_id);
 			return 0;
 		}
-	}
-	/*
-	 * When no matching session is found, allocate
-	 * a new one if a free session is available.
-	 */
-	if (free_session != LSM_INVALID_SESSION_ID) {
-		lsm_client_afe_data[free_session].fe_id = fe_id;
-		lsm_client_afe_data[free_session].unprocessed_data =
-							afe_data_format;
-		pr_debug("%s: session ID is %d, fe_id is %d\n",
-			 __func__, free_session, fe_id);
-		return 0;
 	}
 
 	pr_err("%s: all lsm sessions are taken\n", __func__);
@@ -1328,7 +1262,7 @@ void q6lsm_get_afe_data_format(uint64_t fe_id, uint16_t *afe_data_format)
 		if (fe_id == lsm_client_afe_data[n].fe_id) {
 			*afe_data_format =
 				lsm_client_afe_data[n].unprocessed_data;
-			pr_debug("%s: session: %d, fe_id: %d, afe data: %s\n",
+			pr_debug("%s: session: %d, fe_id: %llu, afe data: %s\n",
 				__func__, n, fe_id,
 				*afe_data_format ? "unprocessed" : "processed");
 			return;
@@ -1642,7 +1576,7 @@ int q6lsm_set_data(struct lsm_client *client,
 
 	param_hdr.param_id = LSM_PARAM_ID_MIN_CONFIDENCE_LEVELS;
 	rc = q6lsm_send_confidence_levels(client, &param_hdr,
-					  LSM_SESSION_CMD_SET_PARAMS, 0);
+					  LSM_SESSION_CMD_SET_PARAMS);
 	if (rc) {
 		pr_err("%s: Failed to send conf_levels, err = %d\n",
 			__func__, rc);
@@ -1720,9 +1654,8 @@ EXPORT_SYMBOL(q6lsm_register_sound_model);
  */
 int q6lsm_deregister_sound_model(struct lsm_client *client)
 {
-	int rc = 0;
+	int rc;
 	struct lsm_cmd_reg_snd_model cmd;
-	struct lsm_sound_model *sm = NULL, *next = NULL;
 	/*
 	 * With multi-stage support sm buff allocation/free usage param info
 	 * to check stage index for which this sound model is being set, and
@@ -1748,42 +1681,19 @@ int q6lsm_deregister_sound_model(struct lsm_client *client)
 		return -EINVAL;
 	}
 
-	if (client->num_sound_models > 0) {
-		p_info.param_type = LSM_DEREG_MULTI_SND_MODEL;
-		list_for_each_entry_safe(sm, next,
-				&client->stage_cfg[p_info.stage_idx].sound_models,
-				list) {
-			pr_debug("%s: current snd_model: %d, num of sound models left %d\n",
-				 __func__, sm->model_id, client->num_sound_models);
-			q6lsm_snd_model_buf_free(client, &p_info, sm);
-			list_del(&sm->list);
-			kfree(sm);
-			sm = NULL;
-			client->num_sound_models--;
+	memset(&cmd, 0, sizeof(cmd));
+	q6lsm_add_hdr(client, &cmd.hdr, sizeof(cmd.hdr), false);
+	cmd.hdr.opcode = LSM_SESSION_CMD_DEREGISTER_SOUND_MODEL;
 
-			if (0 == client->num_sound_models)
-				break;
-		}
+	rc = q6lsm_apr_send_pkt(client, client->apr, &cmd.hdr, true, NULL);
+	if (rc) {
+		pr_err("%s: Failed cmd opcode 0x%x, rc %d\n", __func__,
+		       cmd.hdr.opcode, rc);
 	} else {
-		sm = &client->stage_cfg[p_info.stage_idx].sound_model;
-
-		if (sm && sm->data) {
-			memset(&cmd, 0, sizeof(cmd));
-			q6lsm_add_hdr(client, &cmd.hdr, sizeof(cmd.hdr), false);
-			cmd.hdr.opcode = LSM_SESSION_CMD_DEREGISTER_SOUND_MODEL;
-			p_info.param_type = LSM_DEREG_SND_MODEL;
-
-			rc = q6lsm_apr_send_pkt(client, client->apr, &cmd.hdr, true, NULL);
-			if (rc) {
-				pr_err("%s: Failed cmd opcode 0x%x, rc %d\n", __func__,
-				       cmd.hdr.opcode, rc);
-			} else {
-				pr_debug("%s: Deregister sound model succeeded\n", __func__);
-			}
-
-			q6lsm_snd_model_buf_free(client, &p_info, sm);
-		}
+		pr_debug("%s: Deregister sound model succeeded\n", __func__);
 	}
+
+	q6lsm_snd_model_buf_free(client, &p_info);
 
 	return rc;
 }
@@ -2032,15 +1942,14 @@ fail:
  *
  * @client: LSM client handle
  * @p_info: sound model param info
- * @sm: pointer to sound model
  *
  * Returns 0 on success or error on failure
  */
 int q6lsm_snd_model_buf_free(struct lsm_client *client,
-			     struct lsm_params_info_v2 *p_info,
-			     struct lsm_sound_model *sm)
+			struct lsm_params_info_v2 *p_info)
 {
 	int rc = 0, stage_idx = p_info->stage_idx;
+	struct lsm_sound_model *sm = NULL;
 
 	pr_debug("%s: Session id %d\n", __func__, client->session);
 	if (CHECK_SESSION(client->session)) {
@@ -2048,11 +1957,11 @@ int q6lsm_snd_model_buf_free(struct lsm_client *client,
 		return -EINVAL;
 	}
 
-	if (p_info->param_type == LSM_DEREG_SND_MODEL &&
-	    !client->stage_cfg[stage_idx].sound_model.data)
+	if (!client->stage_cfg[stage_idx].sound_model.data)
 		return 0;
 
 	mutex_lock(&client->cmd_lock);
+	sm = &client->stage_cfg[stage_idx].sound_model;
 	if (sm->mem_map_handle != 0) {
 		rc = q6lsm_memory_unmap_regions(client, sm->mem_map_handle);
 		if (rc)
@@ -2066,10 +1975,7 @@ int q6lsm_snd_model_buf_free(struct lsm_client *client,
 	sm->phys = 0;
 	mutex_unlock(&client->cmd_lock);
 
-	if ((p_info->param_type == LSM_DEREG_MULTI_SND_MODEL &&
-	    client->num_sound_models == 1) ||
-	    p_info->param_type == LSM_DEREG_SND_MODEL)
-		rc = q6lsm_snd_cal_free(client, p_info);
+	rc = q6lsm_snd_cal_free(client, p_info);
 	return rc;
 }
 EXPORT_SYMBOL(q6lsm_snd_model_buf_free);
@@ -2191,20 +2097,20 @@ static int q6lsm_mmapcallback(struct apr_client_data *data, void *priv)
  * Returns 0 on success or error on failure
  */
 int q6lsm_snd_model_buf_alloc(struct lsm_client *client, size_t len,
-			      struct lsm_params_info_v2 *p_info,
-			      struct lsm_sound_model *sm)
+			      struct lsm_params_info_v2 *p_info)
 {
 	int rc = -EINVAL, stage_idx = p_info->stage_idx;
-	int model_id = p_info->model_id;
 	size_t total_mem = 0;
+	struct lsm_sound_model *sm = NULL;
 
 	if (!client)
 		return rc;
 
-	pr_debug("%s:Snd Model len %zd, stage_idx %d, model_id %d\n",
-		 __func__, len, stage_idx, model_id);
+	pr_debug("%s:Snd Model len = %zd, stage idx %d\n",
+			__func__, len, stage_idx);
 
 	mutex_lock(&client->cmd_lock);
+	sm = &client->stage_cfg[stage_idx].sound_model;
 	if (!sm->data) {
 		/*
 		 * If sound model is sent as set_param, i.e. param_id != 0,
@@ -2219,7 +2125,7 @@ int q6lsm_snd_model_buf_alloc(struct lsm_client *client, size_t len,
 		pr_debug("%s: sm param size %zd Total mem %zd, stage_idx %d\n",
 				 __func__, len, total_mem, stage_idx);
 		rc = msm_audio_ion_alloc(&sm->dma_buf, total_mem,
-					 &sm->phys, &len, &sm->data);
+								&sm->phys, &len, &sm->data);
 		if (rc) {
 			pr_err("%s: Audio ION alloc is failed, rc = %d, stage_idx = %d\n",
 				__func__, rc, stage_idx);
@@ -2251,7 +2157,7 @@ int q6lsm_snd_model_buf_alloc(struct lsm_client *client, size_t len,
 fail:
 	mutex_unlock(&client->cmd_lock);
 fail_1:
-	q6lsm_snd_model_buf_free(client, p_info, sm);
+	q6lsm_snd_model_buf_free(client, p_info);
 	return rc;
 }
 EXPORT_SYMBOL(q6lsm_snd_model_buf_alloc);
@@ -2337,8 +2243,8 @@ static int q6lsm_send_param_gain(struct lsm_client *client, u16 gain,
  * Returns 0 on success or error on failure
  */
 int q6lsm_set_one_param(struct lsm_client *client,
-			struct lsm_params_info_v2 *p_info,
-			void *data, uint32_t param_type)
+	struct lsm_params_info_v2 *p_info, void *data,
+	uint32_t param_type)
 {
 	struct param_hdr_v3 param_info;
 	int rc = 0;
@@ -2397,19 +2303,14 @@ int q6lsm_set_one_param(struct lsm_client *client,
 	}
 
 	case LSM_MIN_CONFIDENCE_LEVELS:
-	case LSM_MULTI_SND_MODEL_CONFIDENCE_LEVELS:
 		param_info.module_id = p_info->module_id;
 		param_info.instance_id = p_info->instance_id;
 		param_info.param_id = p_info->param_id;
 		rc = q6lsm_send_confidence_levels(
-			client, &param_info, LSM_SESSION_CMD_SET_PARAMS_V2,
-			p_info->model_id);
+			client, &param_info, LSM_SESSION_CMD_SET_PARAMS_V2);
 		if (rc)
-			pr_err("%s: %s cmd failed, rc %d\n",
-				 __func__,
-				 param_type == LSM_MIN_CONFIDENCE_LEVELS ?
-				 "LSM_MIN_CONFIDENCE_LEVELS" :
-				 "LSM_MULTI_SND_MODEL_CONFIDENCE_LEVELS", rc);
+			pr_err("%s: CONFIDENCE_LEVELS cmd failed, rc %d\n",
+				 __func__, rc);
 		break;
 	case LSM_POLLING_ENABLE: {
 		struct snd_lsm_poll_enable *lsm_poll_enable =
@@ -2426,8 +2327,7 @@ int q6lsm_set_one_param(struct lsm_client *client,
 		break;
 	}
 
-	case LSM_REG_SND_MODEL:
-	case LSM_REG_MULTI_SND_MODEL: {
+	case LSM_REG_SND_MODEL: {
 		struct mem_mapping_hdr mem_hdr;
 		u32 payload_size;
 		struct lsm_sound_model *sm = NULL;
@@ -2441,18 +2341,8 @@ int q6lsm_set_one_param(struct lsm_client *client,
 			payload_size = p_info->param_size +
 				       sizeof(struct param_hdr_v2);
 
-		if (param_type == LSM_REG_MULTI_SND_MODEL) {
-			list_for_each_entry(sm,
-					    &client->stage_cfg[p_info->stage_idx].sound_models,
-					    list) {
-				pr_debug("%s: current snd_model: %d, looking for snd_model %d\n",
-					__func__, sm->model_id, p_info->model_id);
-				if (sm->model_id == p_info->model_id)
-					break;
-			}
-		} else {
-			sm = &client->stage_cfg[p_info->stage_idx].sound_model;
-		}
+		sm = &client->stage_cfg[p_info->stage_idx].sound_model;
+
 		mem_hdr.data_payload_addr_lsw =
 			lower_32_bits(sm->phys);
 		mem_hdr.data_payload_addr_msw =
@@ -2463,41 +2353,28 @@ int q6lsm_set_one_param(struct lsm_client *client,
 		rc = q6lsm_set_params(client, &mem_hdr, NULL, payload_size,
 				      LSM_SESSION_CMD_SET_PARAMS_V2);
 		if (rc) {
-			pr_err("%s: %s failed, rc %d\n",
-				__func__, param_type == LSM_REG_SND_MODEL ?
-				"LSM_REG_SND_MODEL" : "LSM_REG_MULTI_SND_MODEL", rc);
+			pr_err("%s: REG_SND_MODEL failed, rc %d\n",
+				__func__, rc);
 			return rc;
 		}
 
-		if (client->num_sound_models == 0) {
-			rc = q6lsm_send_cal(client, LSM_SESSION_CMD_SET_PARAMS, p_info);
-			if (rc)
-				pr_err("%s: Failed to send lsm cal, err = %d\n",
-					__func__, rc);
-		}
+		rc = q6lsm_send_cal(client, LSM_SESSION_CMD_SET_PARAMS, p_info);
+		if (rc)
+			pr_err("%s: Failed to send lsm cal, err = %d\n",
+				__func__, rc);
 		break;
 	}
 
-	case LSM_DEREG_SND_MODEL:
-	case LSM_DEREG_MULTI_SND_MODEL: {
+	case LSM_DEREG_SND_MODEL: {
 		param_info.module_id = p_info->module_id;
 		param_info.instance_id = p_info->instance_id;
 		param_info.param_id = p_info->param_id;
 		param_info.param_size = 0;
-
-		if (param_type == LSM_DEREG_MULTI_SND_MODEL) {
-			param_info.param_size = p_info->param_size;
-			rc = q6lsm_pack_and_set_params(client, &param_info,
-							(uint8_t *)&p_info->model_id,
-							LSM_SESSION_CMD_SET_PARAMS_V2);
-		} else {
-			rc = q6lsm_pack_and_set_params(client, &param_info, NULL,
-							LSM_SESSION_CMD_SET_PARAMS_V2);
-		}
+		rc = q6lsm_pack_and_set_params(client, &param_info, NULL,
+					       LSM_SESSION_CMD_SET_PARAMS_V2);
 		if (rc)
-			pr_err("%s: %s failed, rc %d\n",
-				__func__,  param_type == LSM_DEREG_SND_MODEL ?
-				"LSM_DEREG_SND_MODEL" : "LSM_DEREG_MULTI_SND_MODEL", rc);
+			pr_err("%s: DEREG_SND_MODEL failed, rc %d\n",
+				__func__, rc);
 		break;
 	}
 
@@ -3084,30 +2961,10 @@ int __init q6lsm_init(void)
 	if (q6lsm_init_cal_data())
 		pr_err("%s: could not init cal data!\n", __func__);
 
-#ifdef CONFIG_DEBUG_FS
-	lsm_common.entry = debugfs_create_dir("q6lsm_apr", NULL);
-	if (!IS_ERR_OR_NULL(lsm_common.entry)) {
-		if (IS_ERR(debugfs_create_bool("panic_on_timeout", 0644,
-					       lsm_common.entry,
-					       &lsm_common.panic_on_timeout)))
-			lsm_common.panic_on_timeout = false;
-		else
-			pr_info("%s: panic_on_timeout debugfs flag is created\n", __func__);
-	}
-#endif
 	return 0;
 }
 
 void q6lsm_exit(void)
 {
-	int i = 0;
 	lsm_delete_cal_data();
-
-	for (; i <= LSM_MAX_SESSION_ID; i++)
-		mutex_destroy(&lsm_common.common_client[i].cmd_lock);
-	mutex_destroy(&lsm_common.apr_lock);
-#ifdef CONFIG_DEBUG_FS
-	debugfs_remove_recursive(lsm_common.entry);
-	lsm_common.entry = NULL;
-#endif
 }

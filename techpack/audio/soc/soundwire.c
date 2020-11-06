@@ -126,7 +126,7 @@ struct swr_device *swr_new_device(struct swr_master *master,
 	list_add_tail(&swr->dev_list, &master->devices);
 	mutex_unlock(&master->mlock);
 
-	dev_set_name(&swr->dev, "%s.%lx", swr->name, swr->addr);
+	dev_set_name(&swr->dev, "%s.%llx", swr->name, swr->addr);
 	result = device_register(&swr->dev);
 	if (result) {
 		dev_err(&master->dev, "device [%s] register failed err %d\n",
@@ -138,7 +138,7 @@ struct swr_device *swr_new_device(struct swr_master *master,
 	return swr;
 
 err_out:
-	dev_dbg(&master->dev, "Failed to register swr device %s at 0x%lx %d\n",
+	dev_dbg(&master->dev, "Failed to register swr device %s at 0x%llx %d\n",
 		swr->name, swr->addr, result);
 	swr_master_put(master);
 	kfree(swr);
@@ -473,6 +473,10 @@ int swr_get_logical_dev_num(struct swr_device *dev, u64 dev_id,
 	}
 	mutex_lock(&master->mlock);
 	ret = master->get_logical_dev_num(master, dev_id, dev_num);
+	if (ret) {
+		pr_err("%s: Error %d to get logical addr for device %llx\n",
+			__func__, ret, dev_id);
+	}
 	mutex_unlock(&master->mlock);
 	return ret;
 }

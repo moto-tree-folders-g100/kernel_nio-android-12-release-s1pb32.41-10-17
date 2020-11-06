@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
  */
 
 
@@ -9,7 +8,7 @@
 #define _APR_AUDIO_V2_H_
 
 #include <ipc/apr.h>
-#include <audio/linux/msm_audio.h>
+#include <linux/msm_audio.h>
 
 /* number of threshold levels in speaker protection module */
 #define MAX_CPS_LEVELS 3
@@ -222,8 +221,6 @@ struct adm_cmd_matrix_map_routings_v5 {
 
 /* Definition for a low latency stream session. */
 #define ADM_LOW_LATENCY_DEVICE_SESSION			0x2000
-
-#define ADM_LOW_LATENCY_NPROC_DEVICE_SESSION		0x6000
 
 /* Definition for a ultra low latency stream session. */
 #define ADM_ULTRA_LOW_LATENCY_DEVICE_SESSION		0x4000
@@ -1361,7 +1358,6 @@ struct adm_cmd_connect_afe_port_v5 {
 #define INT_FM_TX 0x3005
 #define RT_PROXY_PORT_001_RX	0x2000
 #define RT_PROXY_PORT_001_TX	0x2001
-#define RT_PROXY_PORT_002_RX	0x2002
 #define AFE_LOOPBACK_TX	0x6001
 #define HDMI_RX_MS			0x6002
 #define DISPLAY_PORT_RX	0x6020
@@ -1443,7 +1439,7 @@ struct adm_cmd_connect_afe_port_v5 {
 
 /* End of the range of port IDs for TDM devices. */
 #define AFE_PORT_ID_TDM_PORT_RANGE_END \
-	(AFE_PORT_ID_TDM_PORT_RANGE_START+0x100-1)
+	(AFE_PORT_ID_TDM_PORT_RANGE_START+0x60-1)
 
 /* Size of the range of port IDs for TDM ports. */
 #define AFE_PORT_ID_TDM_PORT_RANGE_SIZE \
@@ -1525,7 +1521,6 @@ struct adm_cmd_connect_afe_port_v5 {
 
 #define  AFE_PORT_ID_RT_PROXY_PORT_001_RX   0x2000
 #define  AFE_PORT_ID_RT_PROXY_PORT_001_TX   0x2001
-#define  AFE_PORT_ID_RT_PROXY_PORT_002_RX   0x2002
 #define AFE_PORT_ID_INTERNAL_BT_SCO_RX      0x3000
 #define AFE_PORT_ID_INTERNAL_BT_SCO_TX      0x3001
 #define AFE_PORT_ID_INTERNAL_BT_A2DP_RX     0x3002
@@ -1679,8 +1674,8 @@ struct adm_cmd_connect_afe_port_v5 {
  * Proxyport used for voice call data processing.
  * In cases like call-screening feature, where user can communicate
  * with caller with the help of "call screen" mode, and without
- * connecting the call with any HW input/output devices in the phone,
- * voice call can use Proxy port to start voice data processing.
+ * connecting the call with any HW input/output devices in the phon,
+ * voice call can use Pseudo port to start voice data processing.
  */
 #define RT_PROXY_PORT_002_TX  0x2003
 #define RT_PROXY_PORT_002_RX  0x2002
@@ -1888,142 +1883,6 @@ struct adm_cmd_connect_afe_port_v5 {
 	(AFE_PORT_ID_SENARY_TDM_TX + 0x0C)
 #define AFE_PORT_ID_SENARY_TDM_TX_7 \
 	(AFE_PORT_ID_SENARY_TDM_TX + 0x0E)
-
-#define AFE_PORT_ID_SEPTENARY_TDM_RX \
-	(AFE_PORT_ID_TDM_PORT_RANGE_START + 0x60)
-#define AFE_PORT_ID_SEPTENARY_TDM_RX_1 \
-	(AFE_PORT_ID_SEPTENARY_TDM_RX + 0x02)
-#define AFE_PORT_ID_SEPTENARY_TDM_RX_2 \
-	(AFE_PORT_ID_SEPTENARY_TDM_RX + 0x04)
-#define AFE_PORT_ID_SEPTENARY_TDM_RX_3 \
-	(AFE_PORT_ID_SEPTENARY_TDM_RX + 0x06)
-#define AFE_PORT_ID_SEPTENARY_TDM_RX_4 \
-	(AFE_PORT_ID_SEPTENARY_TDM_RX + 0x08)
-#define AFE_PORT_ID_SEPTENARY_TDM_RX_5 \
-	(AFE_PORT_ID_SEPTENARY_TDM_RX + 0x0A)
-#define AFE_PORT_ID_SEPTENARY_TDM_RX_6 \
-	(AFE_PORT_ID_SEPTENARY_TDM_RX + 0x0C)
-#define AFE_PORT_ID_SEPTENARY_TDM_RX_7 \
-	(AFE_PORT_ID_SEPTENARY_TDM_RX + 0x0E)
-
-#define AFE_PORT_ID_SEPTENARY_TDM_TX \
-	(AFE_PORT_ID_TDM_PORT_RANGE_START + 0x61)
-#define AFE_PORT_ID_SEPTENARY_TDM_TX_1 \
-	(AFE_PORT_ID_SEPTENARY_TDM_TX + 0x02)
-#define AFE_PORT_ID_SEPTENARY_TDM_TX_2 \
-	(AFE_PORT_ID_SEPTENARY_TDM_TX + 0x04)
-#define AFE_PORT_ID_SEPTENARY_TDM_TX_3 \
-	(AFE_PORT_ID_SEPTENARY_TDM_TX + 0x06)
-#define AFE_PORT_ID_SEPTENARY_TDM_TX_4 \
-	(AFE_PORT_ID_SEPTENARY_TDM_TX + 0x08)
-#define AFE_PORT_ID_SEPTENARY_TDM_TX_5 \
-	(AFE_PORT_ID_SEPTENARY_TDM_TX + 0x0A)
-#define AFE_PORT_ID_SEPTENARY_TDM_TX_6 \
-	(AFE_PORT_ID_SEPTENARY_TDM_TX + 0x0C)
-#define AFE_PORT_ID_SEPTENARY_TDM_TX_7 \
-	(AFE_PORT_ID_SEPTENARY_TDM_TX + 0x0E)
-
-#define AFE_PORT_ID_HSIF0_TDM_RX \
-	(AFE_PORT_ID_TDM_PORT_RANGE_START + 0x70)
-#define AFE_PORT_ID_HSIF0_TDM_RX_1 \
-	(AFE_PORT_ID_HSIF0_TDM_RX + 0x02)
-#define AFE_PORT_ID_HSIF0_TDM_RX_2 \
-	(AFE_PORT_ID_HSIF0_TDM_RX + 0x04)
-#define AFE_PORT_ID_HSIF0_TDM_RX_3 \
-	(AFE_PORT_ID_HSIF0_TDM_RX + 0x06)
-#define AFE_PORT_ID_HSIF0_TDM_RX_4 \
-	(AFE_PORT_ID_HSIF0_TDM_RX + 0x08)
-#define AFE_PORT_ID_HSIF0_TDM_RX_5 \
-	(AFE_PORT_ID_HSIF0_TDM_RX + 0x0A)
-#define AFE_PORT_ID_HSIF0_TDM_RX_6 \
-	(AFE_PORT_ID_HSIF0_TDM_RX + 0x0C)
-#define AFE_PORT_ID_HSIF0_TDM_RX_7 \
-	(AFE_PORT_ID_HSIF0_TDM_RX + 0x0E)
-
-#define AFE_PORT_ID_HSIF0_TDM_TX \
-	(AFE_PORT_ID_TDM_PORT_RANGE_START + 0x71)
-#define AFE_PORT_ID_HSIF0_TDM_TX_1 \
-	(AFE_PORT_ID_HSIF0_TDM_TX + 0x02)
-#define AFE_PORT_ID_HSIF0_TDM_TX_2 \
-	(AFE_PORT_ID_HSIF0_TDM_TX + 0x04)
-#define AFE_PORT_ID_HSIF0_TDM_TX_3 \
-	(AFE_PORT_ID_HSIF0_TDM_TX + 0x06)
-#define AFE_PORT_ID_HSIF0_TDM_TX_4 \
-	(AFE_PORT_ID_HSIF0_TDM_TX + 0x08)
-#define AFE_PORT_ID_HSIF0_TDM_TX_5 \
-	(AFE_PORT_ID_HSIF0_TDM_TX + 0x0A)
-#define AFE_PORT_ID_HSIF0_TDM_TX_6 \
-	(AFE_PORT_ID_HSIF0_TDM_TX + 0x0C)
-#define AFE_PORT_ID_HSIF0_TDM_TX_7 \
-	(AFE_PORT_ID_HSIF0_TDM_TX + 0x0E)
-
-#define AFE_PORT_ID_HSIF1_TDM_RX \
-	(AFE_PORT_ID_TDM_PORT_RANGE_START + 0x80)
-#define AFE_PORT_ID_HSIF1_TDM_RX_1 \
-	(AFE_PORT_ID_HSIF1_TDM_RX + 0x02)
-#define AFE_PORT_ID_HSIF1_TDM_RX_2 \
-	(AFE_PORT_ID_HSIF1_TDM_RX + 0x04)
-#define AFE_PORT_ID_HSIF1_TDM_RX_3 \
-	(AFE_PORT_ID_HSIF1_TDM_RX + 0x06)
-#define AFE_PORT_ID_HSIF1_TDM_RX_4 \
-	(AFE_PORT_ID_HSIF1_TDM_RX + 0x08)
-#define AFE_PORT_ID_HSIF1_TDM_RX_5 \
-	(AFE_PORT_ID_HSIF1_TDM_RX + 0x0A)
-#define AFE_PORT_ID_HSIF1_TDM_RX_6 \
-	(AFE_PORT_ID_HSIF1_TDM_RX + 0x0C)
-#define AFE_PORT_ID_HSIF1_TDM_RX_7 \
-	(AFE_PORT_ID_HSIF1_TDM_RX + 0x0E)
-
-#define AFE_PORT_ID_HSIF1_TDM_TX \
-	(AFE_PORT_ID_TDM_PORT_RANGE_START + 0x81)
-#define AFE_PORT_ID_HSIF1_TDM_TX_1 \
-	(AFE_PORT_ID_HSIF1_TDM_TX + 0x02)
-#define AFE_PORT_ID_HSIF1_TDM_TX_2 \
-	(AFE_PORT_ID_HSIF1_TDM_TX + 0x04)
-#define AFE_PORT_ID_HSIF1_TDM_TX_3 \
-	(AFE_PORT_ID_HSIF1_TDM_TX + 0x06)
-#define AFE_PORT_ID_HSIF1_TDM_TX_4 \
-	(AFE_PORT_ID_HSIF1_TDM_TX + 0x08)
-#define AFE_PORT_ID_HSIF1_TDM_TX_5 \
-	(AFE_PORT_ID_HSIF1_TDM_TX + 0x0A)
-#define AFE_PORT_ID_HSIF1_TDM_TX_6 \
-	(AFE_PORT_ID_HSIF1_TDM_TX + 0x0C)
-#define AFE_PORT_ID_HSIF1_TDM_TX_7 \
-	(AFE_PORT_ID_HSIF1_TDM_TX + 0x0E)
-
-#define AFE_PORT_ID_HSIF2_TDM_RX \
-	(AFE_PORT_ID_TDM_PORT_RANGE_START + 0x90)
-#define AFE_PORT_ID_HSIF2_TDM_RX_1 \
-	(AFE_PORT_ID_HSIF2_TDM_RX + 0x02)
-#define AFE_PORT_ID_HSIF2_TDM_RX_2 \
-	(AFE_PORT_ID_HSIF2_TDM_RX + 0x04)
-#define AFE_PORT_ID_HSIF2_TDM_RX_3 \
-	(AFE_PORT_ID_HSIF2_TDM_RX + 0x06)
-#define AFE_PORT_ID_HSIF2_TDM_RX_4 \
-	(AFE_PORT_ID_HSIF2_TDM_RX + 0x08)
-#define AFE_PORT_ID_HSIF2_TDM_RX_5 \
-	(AFE_PORT_ID_HSIF2_TDM_RX + 0x0A)
-#define AFE_PORT_ID_HSIF2_TDM_RX_6 \
-	(AFE_PORT_ID_HSIF2_TDM_RX + 0x0C)
-#define AFE_PORT_ID_HSIF2_TDM_RX_7 \
-	(AFE_PORT_ID_HSIF2_TDM_RX + 0x0E)
-
-#define AFE_PORT_ID_HSIF2_TDM_TX \
-	(AFE_PORT_ID_TDM_PORT_RANGE_START + 0x91)
-#define AFE_PORT_ID_HSIF2_TDM_TX_1 \
-	(AFE_PORT_ID_HSIF2_TDM_TX + 0x02)
-#define AFE_PORT_ID_HSIF2_TDM_TX_2 \
-	(AFE_PORT_ID_HSIF2_TDM_TX + 0x04)
-#define AFE_PORT_ID_HSIF2_TDM_TX_3 \
-	(AFE_PORT_ID_HSIF2_TDM_TX + 0x06)
-#define AFE_PORT_ID_HSIF2_TDM_TX_4 \
-	(AFE_PORT_ID_HSIF2_TDM_TX + 0x08)
-#define AFE_PORT_ID_HSIF2_TDM_TX_5 \
-	(AFE_PORT_ID_HSIF2_TDM_TX + 0x0A)
-#define AFE_PORT_ID_HSIF2_TDM_TX_6 \
-	(AFE_PORT_ID_HSIF2_TDM_TX + 0x0C)
-#define AFE_PORT_ID_HSIF2_TDM_TX_7 \
-	(AFE_PORT_ID_HSIF2_TDM_TX + 0x0E)
 
 #define AFE_PORT_ID_INVALID             0xFFFF
 
@@ -4106,7 +3965,6 @@ struct afe_param_id_device_hw_delay_cfg {
 } __packed;
 
 #define AFE_PARAM_ID_SET_TOPOLOGY    0x0001025A
-#define AFE_PARAM_ID_DEREGISTER_TOPOLOGY	0x000102E8
 #define AFE_API_VERSION_TOPOLOGY_V1 0x1
 
 struct afe_param_id_set_topology_cfg {
@@ -4120,12 +3978,6 @@ struct afe_param_id_set_topology_cfg {
 	 * @values Any valid AFE topology ID
 	 */
 	u32		topology_id;
-} __packed;
-
-#define AFE_PARAM_ID_CODEC_DMA_DATA_ALIGN     0x000102EA
-
-struct afe_param_id_cdc_dma_data_align {
-	uint32_t	cdc_dma_data_align;
 } __packed;
 
 #define MAX_ABR_LEVELS 5
@@ -4244,9 +4096,6 @@ struct afe_id_aptx_adaptive_enc_init
 /* Macro for defining the packetizer ID: COP. */
 #define AFE_MODULE_ID_PACKETIZER_COP 0x0001322A
 
-/* Macro for defining the packetizer ID: COP V2 */
-#define AFE_MODULE_ID_PACKETIZER_COP_V2     0x000132F9
-
 /*
  * Packetizer type parameter for the #AVS_MODULE_ID_ENCODER module.
  * This parameter cannot be set runtime.
@@ -4312,7 +4161,6 @@ struct afe_id_aptx_adaptive_enc_init
  */
 #define AFE_MODULE_ID_DEPACKETIZER_COP        0x00013233
 #define AFE_MODULE_ID_DEPACKETIZER_COP_V1     0x000132E9
-#define AFE_MODULE_ID_DEPACKETIZER_COP_V2     0x000132FC
 
 /* Macros for dynamic loading of modules by AVCS */
 
@@ -4320,21 +4168,9 @@ struct afe_id_aptx_adaptive_enc_init
 
 #define AVS_MODULE_ID_PACKETIZER_COP_V1     0x000132E8
 
-#define AVS_MODULE_ID_PACKETIZER_COP_V2     0x000132F9
-
 #define AVS_MODULE_ID_DEPACKETIZER_COP      0x00013233
 
 #define AVS_MODULE_ID_DEPACKETIZER_COP_V1   0x000132E9
-
-#define AVS_MODULE_ID_DEPACKETIZER_COP_V2   0x000132FC
-
-/*
- * Depacketizer and packetizer type parameter for the
- * #AVS_MODULE_ID_DEPACKETIZER_COP_V2 module and
- * #AVS_MODULE_ID_PACKETIZER_COP_V2 module.
- */
-
-#define AVS_COP_V2_PARAM_ID_STREAM_INFO     0x000132FD
 
 /*
  * Depacketizer type parameter for the #AVS_MODULE_ID_DECODER module.
@@ -4349,12 +4185,6 @@ struct afe_id_aptx_adaptive_enc_init
 struct aptx_channel_mode_param_t {
 	u32 channel_mode;
 } __packed;
-
-#define CAPI_V2_PARAM_SET_LC3_ENC_DOWNMIX_2_MONO    0x00013384
-struct lc3_channel_mode_param_t {
-	u32 channel_mode;
-} __packed;
-
 /*
  * Decoder buffer ID parameter for the #AVS_MODULE_ID_DECODER module.
  * This parameter cannot be set runtime.
@@ -4573,10 +4403,6 @@ struct asm_aac_enc_cfg_t {
 /* FMT ID for apt-X Adaptive speech */
 #define ASM_MEDIA_FMT_APTX_AD_SPEECH 0x00013208
 
-/* FMT ID for lc3 codec */
-#define ASM_MEDIA_FMT_LC3 0x0001337E
-#define ENC_CODEC_TYPE_LC3 0x2B000000
-
 #define PCM_CHANNEL_L         1
 #define PCM_CHANNEL_R         2
 #define PCM_CHANNEL_C         3
@@ -4636,72 +4462,6 @@ struct asm_aptx_ad_speech_enc_cfg_t
 	struct afe_imc_dec_enc_info imc_info;
 	struct asm_aptx_ad_speech_mode_cfg_t speech_mode;
 } __attribute__ ((packed));
-
-
-#define CAPI_V2_PARAM_LC3_ENC_INIT 0x00013381
-#define CAPI_V2_PARAM_LC3_DEC_MODULE_INIT 0x00013391
-struct afe_lc3_stream_map_t {
-	uint32_t stream_id;
-	uint32_t direction;
-	uint32_t channel_mask_lsw;
-	uint32_t channel_mask_msw;
-} __packed;
-
-struct afe_stream_map_t {
-	uint32_t audio_location;
-	uint8_t stream_id;
-	uint8_t direction;
-} __packed;
-
-struct afe_lc3_cfg_t {
-	uint32_t api_version;
-	uint32_t sampling_freq;
-	uint32_t max_octets_per_frame;
-	uint32_t frame_duration;
-	uint32_t bit_depth;
-	uint32_t num_blocks;
-	uint8_t  default_q_level;
-	uint8_t  vendor_specific[16];
-	uint32_t mode;
-} __packed;
-
-struct afe_lc3_enc_cfg_t {
-	struct afe_lc3_cfg_t toAirConfig;
-	uint32_t stream_map_size;
-	struct afe_stream_map_t streamMapOut[16];
-} __packed;
-
-struct afe_lc3_dec_cfg_t {
-	struct afe_lc3_cfg_t FromAir;
-	uint32_t decoder_output_channel;
-	uint32_t stream_map_size;
-	struct afe_stream_map_t streamMapIn[2];
-} __packed;
-
-struct avs_cop_v2_param_id_stream_info_t {
-	uint32_t stream_map_size;
-	struct afe_lc3_stream_map_t streamMap[2];
-} __packed;
-
-struct afe_lc3_dec_config_t {
-	struct afe_lc3_dec_cfg_t from_Air_cfg;
-	struct avs_cop_v2_param_id_stream_info_t streamMapToAir;
-	struct avs_cop_v2_param_id_stream_info_t streamMapFromAir;
-} __packed;
-
-struct afe_lc3_enc_config_t {
-	struct afe_lc3_enc_cfg_t to_Air_cfg;
-	struct avs_cop_v2_param_id_stream_info_t streamMapToAir;
-} __packed;
-
-struct asm_enc_lc3_cfg_t {
-	struct afe_imc_dec_enc_info imc_info;
-	struct afe_lc3_enc_config_t enc_codec;
-} __packed;
-
-struct asm_lc3_dec_cfg_t {
-	struct afe_lc3_dec_config_t dec_codec;
-} __packed;
 
 struct afe_matched_port_t
 {
@@ -4998,14 +4758,12 @@ union afe_enc_config_data {
 	struct asm_ldac_enc_cfg_t  ldac_config;
 	struct asm_aptx_ad_enc_cfg_t  aptx_ad_config;
 	struct asm_aptx_ad_speech_enc_cfg_t aptx_ad_speech_config;
-	struct asm_enc_lc3_cfg_t lc3_enc_config;
 };
 
 struct afe_enc_config {
 	u32 format;
 	u32 scrambler_mode;
 	u32 mono_mode;
-	u32 lc3_mono_mode;
 	union afe_enc_config_data data;
 };
 
@@ -5065,7 +4823,6 @@ union afe_dec_config_data {
 	struct asm_mp3_dec_cfg_t mp3_config;
 	struct asm_aptx_ad_dec_cfg_t aptx_ad_config;
 	struct asm_aptx_ad_speech_dec_cfg_t aptx_ad_speech_config;
-	struct asm_lc3_dec_cfg_t lc3_dec_config;
 };
 
 struct afe_dec_config {
@@ -5202,9 +4959,6 @@ struct avs_dec_congestion_buffer_param_t {
 /* Payload of the AFE_PARAM_ID_ISLAND_CONFIG parameter used by
  * AFE_MODULE_AUDIO_DEV_INTERFACE.
  */
-
-#define AFE_PARAM_ID_POWER_MODE_CONFIG		0x0002002c
-#define AFE_API_VERSION_POWER_MODE_CONFIG		0x1
 struct afe_param_id_island_cfg_t {
 	uint32_t	island_cfg_minor_version;
 	/* Tracks the configuration of this parameter.
@@ -5212,19 +4966,6 @@ struct afe_param_id_island_cfg_t {
 	 */
 
 	uint32_t	island_enable;
-	/* Specifies whether island mode should be enabled or disabled for the
-	 * use-case being setup.
-	 * Supported values: 0 - Disable, 1 - Enable
-	 */
-} __packed;
-
-struct afe_param_id_power_mode_cfg_t {
-	uint32_t	power_mode_cfg_minor_version;
-	/* Tracks the configuration of this parameter
-         * Supported values: #AFE_API_VERSION_POWER_MODE_CONFIG
-	 */
-
-	uint32_t	power_mode_enable;
 	/* Specifies whether island mode should be enabled or disabled for the
 	 * use-case being setup.
 	 * Supported values: 0 - Disable, 1 - Enable
@@ -5729,9 +5470,6 @@ struct afe_param_id_lpass_core_shared_clk_cfg {
 #define ADM_CMD_COPP_OPEN_TOPOLOGY_ID_DTS_HPX		0x10015002
 #define ADM_CMD_COPP_OPEN_TOPOLOGY_ID_AUDIOSPHERE	0x10028000
 #define VPM_TX_DM_FLUENCE_EF_COPP_TOPOLOGY		0x10000005
-#define AUDIO_RX_MONO_VOIP_COPP_TOPOLOGY		0x11000101
-#define VPM_TX_VOICE_FLUENCE_NN_COPP_TOPOLOGY		0x10028008
-#define VPM_TX_VOICE_FLUENCE_NN_COPP_TOPOLOGY_1		0x10010B0F
 
 /* Memory map regions command payload used by the
  * #ASM_CMD_SHARED_MEM_MAP_REGIONS ,#ADM_CMD_SHARED_MEM_MAP_REGIONS
@@ -7609,9 +7347,6 @@ struct asm_data_cmd_read_v2 {
 #define ASM_DATA_EVENT_RENDERED_EOS    0x00010C1C
 #define ASM_DATA_EVENT_EOS             0x00010BDD
 
-#define ASM_DATA_CMD_EOS_V2            0x00012F3C
-#define ASM_DATA_EVENT_RENDERED_EOS_V2 0x00012F3D
-
 #define ASM_DATA_EVENT_WRITE_DONE_V2 0x00010D99
 struct asm_data_event_write_done_v2 {
 	u32                  buf_addr_lsw;
@@ -7901,6 +7636,7 @@ struct asm_data_cmd_iec_60958_frame_rate {
 #define ASM_SESSION_CMD_RUN_STARTIME_RUN_AT_ABSOLUTEIME 1
 #define ASM_SESSION_CMD_RUN_STARTIME_RUN_AT_RELATIVEIME 2
 #define ASM_SESSION_CMD_RUN_STARTIME_RUN_WITH_DELAY     3
+#define ASM_SESSION_CMD_RUN_STARTIME_RUN_WITH_TTP       4
 
 #define ASM_BIT_MASK_RUN_STARTIME                 (0x00000003UL)
 
@@ -7924,6 +7660,7 @@ struct asm_session_cmd_run_v2 {
  *- #ASM_SESSION_CMD_RUN_STARTIME_RUN_AT_ABSOLUTEIME
  *- #ASM_SESSION_CMD_RUN_STARTIME_RUN_AT_RELATIVEIME
  *- #ASM_SESSION_CMD_RUN_STARTIME_RUN_WITH_DELAY
+ *- #ASM_SESSION_CMD_RUN_STARTIME_RUN_WITH_TTP
  *
  *All other bits are reserved; clients must set them to zero.
  */
@@ -8103,8 +7840,6 @@ struct asm_session_cmdrsp_get_path_delay_v2 {
 
 #define ASM_ULTRA_LOW_LATENCY_STREAM_SESSION			0x20000000
 
-#define ASM_ULTRA_LOW_LATENCY_NPROC_STREAM_SESSION		0x30000000
-
 #define ASM_ULL_POST_PROCESSING_STREAM_SESSION			0x40000000
 
 #define ASM_LEGACY_STREAM_SESSION                                      0
@@ -8281,9 +8016,6 @@ struct asm_stream_cmd_open_shared_io {
 
 /* Bit value for Low Latency Tx stream subfield */
 #define ASM_LOW_LATENCY_TX_STREAM_SESSION			1
-
-/* Bit value for Low Latency No Post Processing Tx stream subfield */
-#define ASM_LOW_LATENCY_NPROC_TX_STREAM_SESSION			3
 
 /* Bit shift for the stream_perf_mode subfield. */
 #define ASM_SHIFT_STREAM_PERF_MODE_FLAG_IN_OPEN_READ              29
@@ -12218,9 +11950,6 @@ struct afe_param_id_clip_bank_sel {
 /* Supported LPASS CLK root*/
 #define Q6AFE_LPASS_CLK_ROOT_DEFAULT 0
 
-#define Q6AFE_LPASS_MCLK_IN0 1
-#define Q6AFE_LPASS_MCLK_IN1 2
-
 enum afe_lpass_clk_mode {
 	Q6AFE_LPASS_MODE_BOTH_INVALID,
 	Q6AFE_LPASS_MODE_CLK1_VALID,
@@ -12331,22 +12060,6 @@ enum afe_lpass_clk_mode {
 #define Q6AFE_LPASS_CLK_ID_SEN_TDM_IBIT                           0x20B
 /** Clock ID for Senary TDM EBIT */
 #define Q6AFE_LPASS_CLK_ID_SEN_TDM_EBIT                           0x20C
-/** Clock ID for Septenary TDM IBIT */
-#define Q6AFE_LPASS_CLK_ID_SEP_TDM_IBIT                           0x20D
-/** Clock ID for Septenary TDM EBIT */
-#define Q6AFE_LPASS_CLK_ID_SEP_TDM_EBIT                           0x20E
-/** Clock ID for Hsif0 TDM IBIT */
-#define Q6AFE_LPASS_CLK_ID_HSIF0_TDM_IBIT                          0x20F
-/** Clock ID for Hsif0 TDM EBIT */
-#define Q6AFE_LPASS_CLK_ID_HSIF0_TDM_EBIT                          0x210
-/** Clock ID for Hsif1 TDM IBIT */
-#define Q6AFE_LPASS_CLK_ID_HSIF1_TDM_IBIT                          0x211
-/** Clock ID for Hsif1 TDM EBIT */
-#define Q6AFE_LPASS_CLK_ID_HSIF1_TDM_EBIT                          0x212
-/** Clock ID for Hsif2 TDM IBIT */
-#define Q6AFE_LPASS_CLK_ID_HSIF2_TDM_IBIT                           0x213
-/** Clock ID for Hsif2 TDM EBIT */
-#define Q6AFE_LPASS_CLK_ID_HSIF2_TDM_EBIT                           0x214
 
 /* Clock ID for MCLK1 */
 #define Q6AFE_LPASS_CLK_ID_MCLK_1                                 0x300
@@ -12373,8 +12086,6 @@ enum afe_lpass_clk_mode {
 
 /* Clock ID for AHB HDMI input */
 #define Q6AFE_LPASS_CLK_ID_AHB_HDMI_INPUT                         0x400
-
-#define Q6AFE_LPASS_CLK_ID_SPDIF_CORE                             0x000
 
 /* Clock ID for the primary SPDIF output core. */
 #define AFE_CLOCK_SET_CLOCK_ID_PRI_SPDIF_OUTPUT_CORE              0x500
@@ -12455,34 +12166,6 @@ struct afe_clk_set {
 	uint32_t enable;
 };
 
-#define AVS_BUILD_MAJOR_VERSION_V2		2
-#define AVS_BUILD_MINOR_VERSION_V9		9
-#define AVS_BUILD_BRANCH_VERSION_V0		0
-#define AVS_BUILD_BRANCH_VERSION_V3		3
-
-#define AFE_PARAM_ID_CLOCK_SET_V2		0x000102E6
-
-#define AFE_CLOCK_SET_CLOCK_ROOT_DEFAULT	0x2
-#define AFE_CLOCK_DEFAULT_INTEGER_DIVIDER	0x0
-#define AFE_CLOCK_DEFAULT_M_VALUE		0x1
-#define AFE_CLOCK_DEFAULT_N_VALUE		0x2
-#define AFE_CLOCK_DEFAULT_D_VALUE		0x1
-
-#define AFE_API_VERSION_CLOCK_SET_V2		0x1
-
-struct afe_param_id_clock_set_v2_t {
-	uint32_t	clk_set_minor_version;
-	uint32_t	clk_id;
-	uint32_t	clk_freq_in_hz;
-	uint16_t	clk_attri;
-	uint16_t	clk_root;
-	uint32_t	enable;
-	uint32_t	divider_2x;
-	uint32_t	m;
-	uint32_t	n;
-	uint32_t	d;
-};
-
 struct afe_clk_cfg {
 /* Minor version used for tracking the version of the I2S
  * configuration interface.
@@ -12523,15 +12206,16 @@ struct afe_clk_cfg {
 #define AFE_MODULE_CLOCK_SET		0x0001028F
 #define AFE_PARAM_ID_CLOCK_SET		0x00010290
 
-#define CLK_SRC_NAME_MAX 32
-
-enum {
-	CLK_SRC_INTEGRAL,
-	CLK_SRC_FRACT,
-	CLK_SRC_MAX
-};
-
 struct afe_set_clk_drift {
+	/*
+	 * Clock ID
+	 *	@values
+	 *	- 0x100 to 0x10E
+	 *	- 0x200 to 0x20C
+	 *	- 0x500 to 0x505
+	 */
+	uint32_t clk_id;
+
 	/*
 	 * Clock drift  (in PPB) to be set.
 	 *	@values
@@ -12540,20 +12224,12 @@ struct afe_set_clk_drift {
 	int32_t clk_drift;
 
 	/*
-	 * Clock reset.
+	 * Clock rest.
 	 *	@values
 	 *	- 1 -- Reset PLL with the original frequency
 	 *	- 0 -- Adjust the clock with the clk drift value
 	 */
 	uint32_t clk_reset;
-	/*
-	 * Clock src name.
-	 *  @values
-	 *  - values to be set from machine driver
-	 *  - LPAPLL0 -- integral clk src
-	 *  - LPAPLL2 -- fractional clk src
-	 */
-	char clk_src_name[CLK_SRC_NAME_MAX];
 } __packed;
 
 /* This param id is used to adjust audio interface PLL*/
@@ -12809,22 +12485,7 @@ struct afe_group_device_group_cfg {
 	(AFE_PORT_ID_SENARY_TDM_RX + 0x100)
 #define AFE_GROUP_DEVICE_ID_SENARY_TDM_TX \
 	(AFE_PORT_ID_SENARY_TDM_TX + 0x100)
-#define AFE_GROUP_DEVICE_ID_SEPTENARY_TDM_RX \
-	(AFE_PORT_ID_SEPTENARY_TDM_RX + 0x100)
-#define AFE_GROUP_DEVICE_ID_SEPTENARY_TDM_TX \
-	(AFE_PORT_ID_SEPTENARY_TDM_TX + 0x100)
-#define AFE_GROUP_DEVICE_ID_HSIF0_TDM_RX \
-	(AFE_PORT_ID_HSIF0_TDM_RX + 0x100)
-#define AFE_GROUP_DEVICE_ID_HSIF0_TDM_TX \
-	(AFE_PORT_ID_HSIF0_TDM_TX + 0x100)
-#define AFE_GROUP_DEVICE_ID_HSIF1_TDM_RX \
-	(AFE_PORT_ID_HSIF1_TDM_RX + 0x100)
-#define AFE_GROUP_DEVICE_ID_HSIF1_TDM_TX \
-	(AFE_PORT_ID_HSIF1_TDM_TX + 0x100)
-#define AFE_GROUP_DEVICE_ID_HSIF2_TDM_RX \
-	(AFE_PORT_ID_HSIF2_TDM_RX + 0x100)
-#define AFE_GROUP_DEVICE_ID_HSIF2_TDM_TX \
-	(AFE_PORT_ID_HSIF2_TDM_TX + 0x100)
+
 /* ID of the parameter used by #AFE_MODULE_GROUP_DEVICE to configure the
  * group device. #AFE_SVC_CMD_SET_PARAM can use this parameter ID.
  *
@@ -12947,8 +12608,8 @@ struct afe_param_id_group_device_tdm_cfg {
 	 */
 
 	u32	num_channels;
-	/* Number of active channels = num of active slots * num of active lanes.
-	 * @values 1 to 64
+	/* Number of enabled slots for TDM frame.
+	 * @values 1 to 8
 	 */
 
 	u32	sample_rate;
@@ -13125,6 +12786,12 @@ struct afe_av_dev_drift_get_param_resp {
  */
 #define ASM_SESSION_MTMX_STRTR_PARAM_RENDER_WINDOW_END_V2   0x00010DD2
 
+/* Parameter used by #ASM_SESSION_MTMX_STRTR_MODULE_ID_AVSYNC to specify the
+ * ttp offset value. This parameter is supported only for a Set
+ * command (not a Get command) in the Tx direction
+ */
+#define ASM_SESSION_MTMX_STRTR_PARAM_TTP_OFFSET 0x00013228
+
 /* Generic payload of the window parameters in the
  * #ASM_SESSION_MTMX_STRTR_MODULE_ID_AVSYNC module.
  * This payload is supported only for a Set command
@@ -13233,6 +12900,26 @@ struct asm_session_mtmx_strtr_param_render_mode_t {
 	u32                  flags;
 } __packed;
 
+struct asm_session_mtmx_strtr_param_ttp_offset_t {
+	uint32_t                  ttp_offset_lsw;
+	/* Lower 32 bits of the ttp_offset in microseconds. */
+
+	uint32_t                  ttp_offset_msw;
+	/* Upper 32 bits of the ttp_offset in microseconds.
+	 *
+	 * Internal default value is 0 for both values. The 64-bit number
+	 * formed by ttp_offset_lsw and ttp_offset_lsw is treated as unsigned.
+	 * In case of local DSP loopback when using start flag
+	 * ASM_SESSION_CMD_RUN_START_TIME_RUN_WITH_TTP the max. ttp_offset
+	 * value is limited by internal buffer constraints. Currently the
+	 * limit is 200ms.
+
+	 * This parameter can be set before or while an ASM stream is running,
+	 * allowing “at-run-time” changes of the overall latency.
+	 */
+
+} __packed;
+
 /* Parameter used by #ASM_SESSION_MTMX_STRTR_MODULE_ID_AVSYNC which allows the
  * audio client to specify the clock recovery mechanism that the audio DSP
  * should use.
@@ -13304,6 +12991,7 @@ union asm_session_mtmx_strtr_param_config {
 	struct asm_session_mtmx_strtr_param_render_mode_t render_param;
 	struct asm_session_mtmx_strtr_param_clk_rec_t clk_rec_param;
 	struct asm_session_mtmx_param_adjust_session_time_ctl_t adj_time_param;
+	struct asm_session_mtmx_strtr_param_ttp_offset_t ttp_offset;
 } __packed;
 
 struct asm_mtmx_strtr_params {
@@ -13603,56 +13291,4 @@ struct afe_param_id_tdm_lane_cfg {
 	 */
 };
 
-/** ID of the parameter used to set the AFE port data logging to enable or disable state.
- * For non-group device use cases, #AFE_MODULE_AUDIO_DEV_INTERFACE uses this
- * parameter to configure the flag used for data logging in afe_data_logging_t
- * of the respective port to enabled or disabled state.
- * The HLOS client can use this parameter to configure the data logging
- * disable flag for it's respective port.
- * The reason for this parameter addition is if a number of ports are
- * configured and running, Upon enabling logging through 0x1586 tap point,
- * we will get input/output logs for all the enabled ports.
- * In order to disabled logging for a specific port for which data logging
- * is not needed, the HLOS client can make use of AFE_PORT_DATA_LOGGING_DISABLE flag.
- * This flag will set to AFE_PORT_DATA_LOGGING_ENABLE during port initialization and also
- * during port stop. If port is restarted, the set param should be called again
- * by the HLOS client if needed to disable data logging.
- * @par
- * If HLOS client doesn't set this paramter, by default the disable flag = AFE_PORT_DATA_LOGGING_ENABLE.
- * If HLOS client sets the flag = AFE_PORT_DATA_LOGGING_DISABLE, the respective port will be disabled for data logging.
- */
-#define AFE_PARAM_ID_PORT_DATA_LOGGING_DISABLE            0x000102E9
-
- /** Enable flag for port data logging. */
-#define AFE_PORT_DATA_LOGGING_ENABLE    0
-
-/** Disable flag for port data logging. */
-#define AFE_PORT_DATA_LOGGING_DISABLE   1
-
-/*
- * Payload of the AFE_PARAM_ID_PORT_DATA_LOGGING_DISABLE parameter used by
- * AFE_MODULE_AUDIO_DEV_INTERFACE
- */
-struct afe_param_id_port_data_log_disable_t
-{
-	uint32_t           disable_logging_flag;
-	/** Flag for enabling or disabling data logging.
-	 * @values
-	 * - AFE_PORT_DATA_LOGGING_ENABLE  - enable data logging.
-	 * - AFE_PORT_DATA_LOGGING_DISABLE - disable data logging.
-	 */
-} __packed;
-
-#define AFE_MODULE_LIMITER  0x000102A8
-#define AFE_PARAM_ID_ENABLE 0x00010203
-struct afe_param_id_port_afe_limiter_disable_t
-{
-	uint16_t           disable_afe_limiter;
-	/** Flag for enabling or disabling data logging.
-	 * @values
-	 * - AFE_PORT_DATA_LOGGING_ENABLE  - enable data logging.
-	 * - AFE_PORT_DATA_LOGGING_DISABLE - disable data logging.
-	 */
-	 uint16_t	reserved;
-} __packed;
 #endif /*_APR_AUDIO_V2_H_ */

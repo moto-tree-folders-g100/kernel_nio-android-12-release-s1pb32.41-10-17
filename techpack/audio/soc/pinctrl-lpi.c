@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/gpio.h>
@@ -13,7 +14,6 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/types.h>
-#include <linux/ratelimit.h>
 #include <linux/clk.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
@@ -149,19 +149,16 @@ static int lpi_gpio_read(struct lpi_gpio_pad *pad, unsigned int addr)
 {
 	int ret = 0;
 	struct lpi_gpio_state *state = dev_get_drvdata(lpi_dev);
-	static DEFINE_RATELIMIT_STATE(rtl, 1 * HZ, 1);
 
 	if (!lpi_dev_up) {
-		if (__ratelimit(&rtl))
-			pr_err("%s: ADSP is down due to SSR, return\n",
+		pr_err_ratelimited("%s: ADSP is down due to SSR, return\n",
 				   __func__);
 		return 0;
 	}
 	pm_runtime_get_sync(lpi_dev);
 	mutex_lock(&state->core_hw_vote_lock);
 	if (!state->core_hw_vote_status) {
-		if (__ratelimit(&rtl))
-			pr_err("%s: core hw vote clk is not enabled\n",
+		pr_err_ratelimited("%s: core hw vote clk is not enabled\n",
 				__func__);
 		ret = -EINVAL;
 		goto err;
@@ -183,16 +180,16 @@ static int lpi_gpio_write(struct lpi_gpio_pad *pad, unsigned int addr,
 {
 	struct lpi_gpio_state *state = dev_get_drvdata(lpi_dev);
 	int ret = 0;
-	static DEFINE_RATELIMIT_STATE(rtl, 1 * HZ, 1);
 
 	if (!lpi_dev_up) {
+		pr_err_ratelimited("%s: ADSP is down due to SSR, return\n",
+				  __func__);
 		return 0;
 	}
 	pm_runtime_get_sync(lpi_dev);
 	mutex_lock(&state->core_hw_vote_lock);
 	if (!state->core_hw_vote_status) {
-		if (__ratelimit(&rtl))
-			pr_err("%s: core hw vote clk is not enabled\n",
+		pr_err_ratelimited("%s: core hw vote clk is not enabled\n",
 				__func__);
 		ret = -EINVAL;
 		goto err;
@@ -265,12 +262,14 @@ static int lpi_gpio_set_mux(struct pinctrl_dev *pctldev, unsigned int function,
 
 	pad = pctldev->desc->pins[pin].drv_data;
 
-	pad->function = function;
+	if (pad != NULL) {
+		pad->function = function;
 
-	val = lpi_gpio_read(pad, LPI_GPIO_REG_VAL_CTL);
-	val &= ~(LPI_GPIO_REG_FUNCTION_MASK);
-	val |= pad->function << LPI_GPIO_REG_FUNCTION_SHIFT;
-	lpi_gpio_write(pad, LPI_GPIO_REG_VAL_CTL, val);
+		val = lpi_gpio_read(pad, LPI_GPIO_REG_VAL_CTL);
+		val &= ~(LPI_GPIO_REG_FUNCTION_MASK);
+		val |= pad->function << LPI_GPIO_REG_FUNCTION_SHIFT;
+		lpi_gpio_write(pad, LPI_GPIO_REG_VAL_CTL, val);
+	}
 	return 0;
 }
 
@@ -657,7 +656,7 @@ static int lpi_pinctrl_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	ret = of_property_read_u32(dev->of_node, "qcom,gpios-count", &npins);
+	ret = of_property_read_u32(dev->of_node, "qcom,num-gpios", &npins);
 	if (ret < 0)
 		return ret;
 
@@ -711,7 +710,7 @@ static int lpi_pinctrl_probe(struct platform_device *pdev)
 		}
 	} else {
 		slew_base = NULL;
-		dev_dbg(dev, "error in reading lpi slew register: %d\n",
+		dev_dbg(dev, "%s: error in reading lpi slew register: %d\n",
 			__func__, ret);
 	}
 

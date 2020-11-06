@@ -1,12 +1,12 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2014, 2018, 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014, 2018, 2020, The Linux Foundation. All rights reserved.
  */
 #ifndef _AUDIO_CAL_UTILS_H
 #define _AUDIO_CAL_UTILS_H
 
 #include <linux/msm_ion.h>
-#include <audio/linux/msm_audio_calibration.h>
+#include <linux/msm_audio_calibration.h>
 #include <dsp/msm_audio_ion.h>
 #include <dsp/audio_calibration.h>
 
@@ -30,7 +30,6 @@ struct cal_block_data {
 	struct list_head	list;
 	struct cal_data		cal_data;
 	bool			cal_stale;
-	bool			cma_mem;
 	struct mem_map_data	map_data;
 	int32_t			buffer_number;
 };

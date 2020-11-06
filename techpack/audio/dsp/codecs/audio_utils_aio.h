@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (C) 2008 Google, Inc.
  * Copyright (C) 2008 HTC Corporation
- * Copyright (c) 2009-2018, 2020-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2009-2018, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/fs.h>
@@ -11,7 +11,7 @@
 #include <linux/sched.h>
 #include <linux/uaccess.h>
 #include <linux/wait.h>
-#include <audio/linux/msm_audio.h>
+#include <linux/msm_audio.h>
 #include <linux/debugfs.h>
 #include <linux/list.h>
 #include <linux/slab.h>
@@ -188,7 +188,6 @@ struct q6audio_aio {
 	int rflush;             /* Read  flush */
 	int wflush;             /* Write flush */
 	bool reset_event;
-	bool wake_event_initialized;
 	long (*codec_ioctl)(struct file *, unsigned int, unsigned long);
 	long (*codec_compat_ioctl)(struct file *, unsigned int, unsigned long);
 };
@@ -219,14 +218,4 @@ int enable_volume_ramp(struct q6audio_aio *audio);
 int audio_aio_debug_open(struct inode *inode, struct file *file);
 ssize_t audio_aio_debug_read(struct file *file, char __user *buf,
 			size_t count, loff_t *ppos);
-#else
-static inline int audio_aio_debug_open(struct inode *inode, struct file *file)
-{
-       return 0;
-}
-static inline ssize_t audio_aio_debug_read(struct file *file, char __user *buf,
-                       size_t count, loff_t *ppos)
-{
-       return 0;
-}
 #endif
