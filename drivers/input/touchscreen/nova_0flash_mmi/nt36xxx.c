@@ -222,12 +222,15 @@ const struct mtk_chip_config spi_ctrdata = {
 
 static uint8_t bTouchIsAwake = 0;
 
+<<<<<<< HEAD
 /* Double tap detection resources */
 #define DT2W_FEATHER        150
 #define DT2W_TIME         500
 static unsigned long long tap_time_pre = 0;
 static int touch_nr = 0, x_pre = 0, y_pre = 0;
 
+=======
+>>>>>>> a79194d4df3d (treewide: Import moto modules)
 /*******************************************************
 Description:
 	Novatek touchscreen irq enable/disable function.
@@ -1076,9 +1079,15 @@ void nvt_ts_wakeup_gesture_report(uint8_t gesture_id, uint8_t *data)
 			return;
 		}
 		if (ts->report_gesture_key) {
+<<<<<<< HEAD
 			input_report_key(ts->sensor_pdata->input_sensor_dev, KEY_POWER, 1);
 			input_sync(ts->sensor_pdata->input_sensor_dev);
 			input_report_key(ts->sensor_pdata->input_sensor_dev, KEY_POWER, 0);
+=======
+			input_report_key(ts->sensor_pdata->input_sensor_dev, KEY_F1, 1);
+			input_sync(ts->sensor_pdata->input_sensor_dev);
+			input_report_key(ts->sensor_pdata->input_sensor_dev, KEY_F1, 0);
+>>>>>>> a79194d4df3d (treewide: Import moto modules)
 			input_sync(ts->sensor_pdata->input_sensor_dev);
 			++report_cnt;
 		} else {
@@ -1515,6 +1524,7 @@ static int32_t nvt_ts_point_data_checksum(uint8_t *buf, uint8_t length)
 #define POINT_DATA_LEN 65
 #endif
 
+<<<<<<< HEAD
 /* Doubletap2wake */
 
 static void doubletap2wake_reset(void) {
@@ -1563,6 +1573,8 @@ static bool detect_doubletap2wake(int x, int y)
 	return false;
 }
 
+=======
+>>>>>>> a79194d4df3d (treewide: Import moto modules)
 /*******************************************************
 Description:
 	Novatek touchscreen work function.
@@ -1643,10 +1655,15 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 
 #if WAKEUP_GESTURE
 	if (bTouchIsAwake == 0) {
+<<<<<<< HEAD
 		if (detect_doubletap2wake(input_x, input_y)) {
 			input_id = (uint8_t)(point_data[1] >> 3);
 			nvt_ts_wakeup_gesture_report(input_id, point_data);
 		}
+=======
+		input_id = (uint8_t)(point_data[1] >> 3);
+		nvt_ts_wakeup_gesture_report(input_id, point_data);
+>>>>>>> a79194d4df3d (treewide: Import moto modules)
 		mutex_unlock(&ts->lock);
 		return IRQ_HANDLED;
 	}
@@ -1917,7 +1934,11 @@ static int nvt_sensor_init(struct nvt_ts_data *data)
 
 	if (data->report_gesture_key) {
 		__set_bit(EV_KEY, sensor_input_dev->evbit);
+<<<<<<< HEAD
 		__set_bit(KEY_POWER, sensor_input_dev->keybit);
+=======
+		__set_bit(KEY_F1, sensor_input_dev->keybit);
+>>>>>>> a79194d4df3d (treewide: Import moto modules)
 	} else {
 		__set_bit(EV_ABS, sensor_input_dev->evbit);
 		input_set_abs_params(sensor_input_dev, ABS_DISTANCE,
@@ -2481,7 +2502,11 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 	}
 	INIT_DELAYED_WORK(&ts->nvt_fwu_work, Boot_Update_Firmware);
 	// please make sure boot update start after display reset(RESX) sequence
+<<<<<<< HEAD
 	queue_delayed_work(nvt_fwu_wq, &ts->nvt_fwu_work, msecs_to_jiffies(7000));
+=======
+	queue_delayed_work(nvt_fwu_wq, &ts->nvt_fwu_work, msecs_to_jiffies(14000));
+>>>>>>> a79194d4df3d (treewide: Import moto modules)
 #endif
 #ifdef LCM_FAST_LIGHTUP
 	INIT_WORK(&ts_resume_work, nova_resume_work_func);

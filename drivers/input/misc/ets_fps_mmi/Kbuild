@@ -5,9 +5,13 @@ ifneq ($(filter m y,$(CONFIG_INPUT_EGISTEC_FPS_NAVI_HORIZON)),)
 	EXTRA_CFLAGS += -DCONFIG_INPUT_EGISTEC_FPS_NAVI_HORIZON
 endif
 
+<<<<<<< HEAD
 ets_fps_mmi-y := ets_fps.o
 
 obj-$(CONFIG_INPUT_EGISTEC_FPS) += ets_fps_mmi.o
+=======
+obj-$(CONFIG_INPUT_EGISTEC_FPS) += ets_fps.o
+>>>>>>> a79194d4df3d (treewide: Import moto modules)
 
 ifneq ($(filter m y,$(CONFIG_INPUT_EGISTEC_FPS_NAVI)),)
 	EXTRA_CFLAGS += -DCONFIG_INPUT_EGISTEC_FPS_NAVI
