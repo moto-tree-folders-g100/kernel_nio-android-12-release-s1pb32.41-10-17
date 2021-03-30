@@ -8,9 +8,13 @@ config INPUT_EGISTEC_FPS
 config INPUT_EGISTEC_FPS_NAVI
 	bool "Egistec fingerprint sensor MMI navigation support"
 <<<<<<< HEAD
+<<<<<<< HEAD
         depends on INPUT_EGISTEC_FPS
 =======
 >>>>>>> a79194d4df3d (treewide: Import moto modules)
+=======
+        depends on INPUT_EGISTEC_FPS
+>>>>>>> ce81d4d06625 (treewide: Import missed moto modules)
 	default n
 	help
 	 Say Y here if you wish to include support for MMI EGIS finger print sensor
@@ -20,9 +24,13 @@ config INPUT_EGISTEC_FPS_NAVI
 config INPUT_EGISTEC_FPS_NAVI_VERTICAL
 	bool "Egistec fingerprint sensor MMI navigation vertical support"
 <<<<<<< HEAD
+<<<<<<< HEAD
         depends on INPUT_EGISTEC_FPS_NAVI
 =======
 >>>>>>> a79194d4df3d (treewide: Import moto modules)
+=======
+        depends on INPUT_EGISTEC_FPS_NAVI
+>>>>>>> ce81d4d06625 (treewide: Import missed moto modules)
 	default n
 	help
 	 Say Y here if you wish to include support for MMI EGIS finger print sensor
@@ -32,15 +40,22 @@ config INPUT_EGISTEC_FPS_NAVI_VERTICAL
 config INPUT_EGISTEC_FPS_NAVI_HORIZON
 	bool "Egistec fingerprint sensor MMI navigation horizon support"
 <<<<<<< HEAD
+<<<<<<< HEAD
         depends on INPUT_EGISTEC_FPS_NAVI
 =======
 >>>>>>> a79194d4df3d (treewide: Import moto modules)
+=======
+        depends on INPUT_EGISTEC_FPS_NAVI
+>>>>>>> ce81d4d06625 (treewide: Import missed moto modules)
 	default n
 	help
 	 Say Y here if you wish to include support for MMI EGIS finger print sensor
          horizon navigation functions.
 	 If unsure, say N.
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> ce81d4d06625 (treewide: Import missed moto modules)
 
 config NAV_DOUBLE_TAP
         bool "Egistec fingerprint sensor MMI double click support"
@@ -49,5 +64,8 @@ config NAV_DOUBLE_TAP
         help
          Say Y here if you wish to include support for MMI EGIS finger print sensor
          double click functions.
+<<<<<<< HEAD
 =======
 >>>>>>> a79194d4df3d (treewide: Import moto modules)
+=======
+>>>>>>> ce81d4d06625 (treewide: Import missed moto modules)
