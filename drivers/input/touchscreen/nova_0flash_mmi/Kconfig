@@ -27,7 +27,6 @@ config INPUT_NOVA_PANEL_NOTIFICATIONS
 	  Say Y here if you want to have panel notification support on Moto Novatek NT36xxx.
 
 	  If unsure, say N.
-<<<<<<< HEAD
 
 config NOVA_ESD_ENABLE
         bool "Moto Novatek NT36xxx ESD Detection"
@@ -37,5 +36,3 @@ config NOVA_ESD_ENABLE
           Say Y here if you want to have ESD Detection support on Moto Novatek NT36xxx.
 
           If unsure, say N.
-=======
->>>>>>> a79194d4df3d (treewide: Import moto modules)
