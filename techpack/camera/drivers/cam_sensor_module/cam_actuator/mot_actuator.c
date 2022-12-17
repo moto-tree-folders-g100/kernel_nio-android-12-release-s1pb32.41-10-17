@@ -26,6 +26,7 @@
 #include "cam_cci_dev.h"
 #include "mot_actuator.h"
 #include "mot_actuator_policy.h"
+#include "linux/pm_wakeup.h"
 
 /*=================ACTUATOR HW INFO====================*/
 #define DEVICE_NAME_LEN 32
@@ -63,7 +64,9 @@ typedef struct {
 
 typedef struct {
 	mot_actuator_type actuator_type;
-	uint16_t dac_pos;
+	uint16_t flat_up_dac_pos;
+	uint16_t flat_down_dac_pos;
+	uint16_t non_flat_dac_pos;
 	uint16_t cci_addr;
 	uint16_t cci_dev;
 	uint16_t cci_master;
@@ -74,6 +77,7 @@ typedef struct {
 
 typedef struct {
 	mot_dev_type dev_type;
+	uint16_t actuator_num;
 	char dev_name[DEVICE_NAME_LEN];
 	mot_actuator_hw_info actuator_info[MAX_ACTUATOR_NUM];
 } mot_dev_info;
@@ -142,11 +146,14 @@ static mot_actuator_settings mot_actuator_list[MOT_ACTUATOR_NUM-1] = {
 static const mot_dev_info mot_dev_list[MOT_DEVICE_NUM] = {
 	{
 		.dev_type = MOT_DEVICE_NIO,
+		.actuator_num = 1,
 		.dev_name = "nio",
 		.actuator_info = {
 			[0] = {
 				.actuator_type = MOT_ACTUATOR_GT9772,
-				.dac_pos = 400,
+				.flat_up_dac_pos = 380,
+				.flat_down_dac_pos = 520,
+				.non_flat_dac_pos = 450,
 				.cci_addr = 0x0c,
 				.cci_dev = 0x01,
 				.cci_master = 0x0,
@@ -189,6 +196,7 @@ struct mot_actuator_ctrl_t {
 	struct workqueue_struct *mot_actuator_wq;
 	struct delayed_work delay_work;
 	struct mutex actuator_lock;
+	struct wakeup_source actuator_wakelock;
 };
 
 enum mot_actuator_state_e {
@@ -196,6 +204,12 @@ enum mot_actuator_state_e {
 	MOT_ACTUATOR_INITED,
 	MOT_ACTUATOR_STARTED,
 	MOT_ACTUATOR_RELEASED
+};
+
+enum mot_phone_posture_e {
+	MOT_PHONE_NO_FLAT,
+	MOT_PHONE_FLAT_UP,
+	MOT_PHONE_FLAT_DOWN,
 };
 
 typedef struct {
@@ -209,12 +223,107 @@ static struct mot_actuator_ctrl_t mot_actuator_fctrl;
 static enum mot_actuator_state_e mot_actuator_state = MOT_ACTUATOR_IDLE;
 static mot_actuator_runtime_type mot_actuator_runtime[MAX_ACTUATOR_NUM];
 static uint32_t lens_safe_pos_dac = 0;
+static uint32_t posture_comp_dac = 0;
 static uint32_t lens_park_pos = 100;
 static mot_park_lens_step lens_park_table[PARK_LENS_MAX_STAGES] = {
 	{300, 60},
 	{200, 40},
 };
+static enum mot_phone_posture_e cur_phone_posture = MOT_PHONE_NO_FLAT;
 static bool runtime_inited = 0;
+
+static enum mot_phone_posture_e mot_actuator_get_posture(void)
+{
+	enum mot_phone_posture_e pos = MOT_PHONE_NO_FLAT;
+	if (mot_device_index >= MOT_DEVICE_NUM) {
+		CAM_ERR(CAM_ACTUATOR, "INVALID DEVICE!!!");
+		return pos;
+	}
+
+	if (!strcmp(mot_dev_list[mot_device_index].dev_name,"nio")) {
+		#define FLAT_DET_GPIO 1136
+		#define FLAT_TYPE_DET_GPIO 1145
+		int rc = 0;
+		int flat_det_val, flat_type_det_val;
+		rc =  gpio_request(FLAT_DET_GPIO, "flat_det");
+		if (rc < 0) {
+			CAM_ERR(CAM_ACTUATOR, "FLAT DET GPIO request failed!!!", rc);
+		}
+		rc = gpio_request(FLAT_TYPE_DET_GPIO, "flat_type_det");
+		if (rc < 0) {
+			CAM_ERR(CAM_ACTUATOR, "FLAT TYPE DET GPIO request failed!!!", rc);
+		}
+		flat_det_val = gpio_get_value(FLAT_DET_GPIO);
+		flat_type_det_val = gpio_get_value(FLAT_TYPE_DET_GPIO);
+		gpio_free(FLAT_DET_GPIO);
+		gpio_free(FLAT_TYPE_DET_GPIO);
+
+		if (flat_det_val == 1) {
+			if (flat_type_det_val == 1) {
+				//FLAT UP
+				pos = MOT_PHONE_FLAT_UP;
+			} else {
+				//FLAT DOWN
+				pos = MOT_PHONE_FLAT_DOWN;
+			}
+		} else {
+			pos = MOT_PHONE_NO_FLAT;
+		}
+		CAM_DBG(CAM_ACTUATOR, "flat val: %d, type: %d, pos: %d", flat_det_val, flat_type_det_val, pos);
+	}
+
+	return pos;
+}
+
+static uint16_t mot_actuator_get_dac_by_posture(uint32_t index, enum mot_phone_posture_e posture)
+{
+	uint16_t dac_val = lens_safe_pos_dac;
+	bool is_tuning = (lens_safe_pos_dac > 0 && posture_comp_dac > 0);
+
+	if (mot_device_index >= MOT_DEVICE_NUM || index > mot_dev_list[mot_device_index].actuator_num) {
+		CAM_ERR(CAM_ACTUATOR, "INVALID DEVICE/DEVICE_INDEX!!!");
+		return dac_val;
+	}
+
+	switch (posture) {
+		case MOT_PHONE_FLAT_UP:
+			dac_val = is_tuning ? (lens_safe_pos_dac - posture_comp_dac) :
+				mot_dev_list[mot_device_index].actuator_info[index].flat_up_dac_pos;
+			break;
+		case MOT_PHONE_FLAT_DOWN:
+			dac_val = is_tuning ? (lens_safe_pos_dac + posture_comp_dac) :
+				mot_dev_list[mot_device_index].actuator_info[index].flat_down_dac_pos;
+			break;
+		case MOT_PHONE_NO_FLAT:
+		default:
+			dac_val = is_tuning ? lens_safe_pos_dac :
+				mot_dev_list[mot_device_index].actuator_info[index].non_flat_dac_pos;
+			break;
+	}
+
+	return dac_val;
+}
+
+static void mot_actuator_update_safe_dac_by_posture(void)
+{
+	int i;
+	enum mot_phone_posture_e posture = mot_actuator_get_posture();
+
+	if (mot_device_index >= MOT_DEVICE_NUM) {
+		CAM_ERR(CAM_ACTUATOR, "INVALID DEVICE!!!");
+		return;
+	}
+
+	if (posture != cur_phone_posture) {
+		CAM_DBG(CAM_ACTUATOR, "Phone posture changed from %d to %d", cur_phone_posture, posture);
+		for (i = 0; i < mot_dev_list[mot_device_index].actuator_num; i++) {
+			mot_actuator_runtime[i].safe_dac_pos = mot_actuator_get_dac_by_posture(i, posture);
+			CAM_DBG(CAM_ACTUATOR, "Phone posture changed from %d to %d, safe pos: %d",
+				cur_phone_posture, posture, mot_actuator_runtime[i].safe_dac_pos);
+		}
+		cur_phone_posture = posture;
+	}
+}
 
 static int mot_actuator_init_runtime(void)
 {
@@ -222,7 +331,7 @@ static int mot_actuator_init_runtime(void)
 	int regIdx;
 
 	if (runtime_inited == true) {
-		CAM_DBG(CAM_ACTUATOR, "Runtime has been inited!!!");
+		mot_actuator_update_safe_dac_by_posture();
 		return 0;
 	}
 
@@ -231,7 +340,7 @@ static int mot_actuator_init_runtime(void)
 		return -1;
 	}
 
-	for (i = 0; i < MAX_ACTUATOR_NUM; i++) {
+	for (i = 0; i < mot_dev_list[mot_device_index].actuator_num; i++) {
 		if (mot_dev_list[mot_device_index].actuator_info[i].actuator_type == MOT_ACTUATOR_INVALID) {
 			CAM_DBG(CAM_ACTUATOR, "NO. %d actuator type is %d",
 				i, mot_dev_list[mot_device_index].actuator_info[i].actuator_type);
@@ -252,7 +361,7 @@ static int mot_actuator_init_runtime(void)
 		if (lens_safe_pos_dac != 0) {
 			mot_actuator_runtime[i].safe_dac_pos = lens_safe_pos_dac;
 		} else {
-			mot_actuator_runtime[i].safe_dac_pos = mot_dev_list[mot_device_index].actuator_info[i].dac_pos;
+			mot_actuator_runtime[i].safe_dac_pos = mot_actuator_get_dac_by_posture(i, mot_actuator_get_posture());
 		}
 		CAM_DBG(CAM_ACTUATOR, "ACTUATOR NO. %d, DAC pos: %d", i, mot_actuator_runtime[i].safe_dac_pos);
 
@@ -369,7 +478,7 @@ static int32_t mot_actuator_vib_move_lens(uint32_t index)
 {
 	int32_t ret = 0;
 
-	if (mot_device_index >= MOT_DEVICE_NUM || index >= MAX_ACTUATOR_NUM) {
+	if (mot_device_index >= MOT_DEVICE_NUM || index > mot_dev_list[mot_device_index].actuator_num) {
 		CAM_ERR(CAM_ACTUATOR, "INVALID device!!!");
 		return -1;
 	}
@@ -478,10 +587,19 @@ static int32_t mot_actuator_park_lens(uint32_t index)
 
 int mot_actuator_on_vibrate_start(void)
 {
+	bool is_exiting = false;
 	ktime_t start,end,duration;
 	start = ktime_get();
+	__pm_stay_awake(&mot_actuator_fctrl.actuator_wakelock);
 	cancel_delayed_work(&mot_actuator_fctrl.delay_work);
+	if (mutex_is_locked(&mot_actuator_fctrl.actuator_lock)) {
+		is_exiting = true;
+	}
 	mutex_lock(&mot_actuator_fctrl.actuator_lock);
+	if (is_exiting) {
+		CAM_WARN(CAM_ACTUATOR, "Wait 2~3ms to let CCI release done.");
+		usleep_range(2, 3);
+	}
 	mot_actuator_vib_move_lens(0);
 	mutex_unlock(&mot_actuator_fctrl.actuator_lock);
 	end = ktime_get();
@@ -511,7 +629,6 @@ static int32_t mot_actuator_handle_exit(uint32_t arg)
 
 	return rc;
 }
-
 static int32_t mot_actuator_handle_write(uint32_t arg)
 {
 	int rc = 0;
@@ -694,6 +811,7 @@ static void mot_actuator_delayed_process(struct work_struct *work)
 	}
 	mot_actuator_state = MOT_ACTUATOR_RELEASED;
 	mutex_unlock(&actuator_fctrl->actuator_lock);
+	__pm_relax(&actuator_fctrl->actuator_wakelock);
 }
 
 static inline ssize_t msm_actuator_show(struct device *dev,
@@ -780,6 +898,31 @@ exit:
 	return retval;
 }
 
+static inline ssize_t mot_actuator_posture_comp_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	ssize_t count = 0;
+	count = sprintf(buf, "\n posture comp dac value steps: %d\n", posture_comp_dac);
+	return count;
+}
+
+static ssize_t mot_actuator_posture_comp_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int retval;
+	unsigned int input;
+
+	if (kstrtouint(buf, 10, &input) != 0) {
+		retval = -EINVAL;
+		goto exit;
+	}
+
+	posture_comp_dac = input;
+
+	retval = count;
+exit:
+	return retval;
+}
 
 static inline ssize_t mot_actuator_dump_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -852,6 +995,9 @@ static struct device_attribute mot_actuator_attrs[] = {
 	__ATTR(safe_pos, 0660,
 			mot_actuator_safe_pos_show,
 			mot_actuator_safe_pos_store),
+	__ATTR(posture_comp, 0660,
+			mot_actuator_posture_comp_show,
+			mot_actuator_posture_comp_store),
 	__ATTR(park_lens_table, 0660,
 			mot_actuator_park_lens_table_show,
 			mot_actuator_park_lens_table_store),
@@ -884,6 +1030,9 @@ static int mot_actuator_init_subdev(struct mot_actuator_ctrl_t *f_ctrl)
 
 	INIT_DELAYED_WORK(&f_ctrl->delay_work, mot_actuator_delayed_process);
 	mutex_init(&f_ctrl->actuator_lock);
+	memset(&f_ctrl->actuator_wakelock, 0, sizeof(f_ctrl->actuator_wakelock));
+	f_ctrl->actuator_wakelock.name = "actuator_hold_wl";
+	wakeup_source_add(&f_ctrl->actuator_wakelock);
 
 	{//Debug/tuning interfaces
 		int i;
@@ -920,6 +1069,8 @@ static void __exit mot_actuator_exit(void)
 		mot_actuator_fctrl.mot_actuator_wq = NULL;
 	}
 	cam_unregister_subdev(&mot_actuator_fctrl.v4l2_dev_str);
+	__pm_relax(&mot_actuator_fctrl.actuator_wakelock);
+	wakeup_source_remove(&mot_actuator_fctrl.actuator_wakelock);
 }
 
 module_init(mot_actuator_init);

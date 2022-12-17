@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
 #ifndef _SWR_WCD_CTRL_H
@@ -51,6 +51,7 @@ enum {
 	SWR_MSTR_UP,
 	SWR_MSTR_DOWN,
 	SWR_MSTR_SSR,
+	SWR_MSTR_SSR_RESET,
 };
 
 enum swrm_pm_state {
@@ -71,6 +72,11 @@ enum {
 	SWR_VISENSE_PORT,
 };
 
+enum {
+	SWR_PDM = 0,
+	SWR_PCM,
+};
+
 struct usecase {
 	u8 num_port;
 	u8 num_ch;
@@ -84,13 +90,15 @@ struct swrm_mports {
 	u8 req_ch;
 	u8 offset1;
 	u8 offset2;
-	u8 sinterval;
+	u16 sinterval;
 	u8 hstart;
 	u8 hstop;
 	u8 blk_grp_count;
 	u8 blk_pack_mode;
 	u8 word_length;
 	u8 lane_ctrl;
+	u8 dir;
+	u8 stream_type;
 	u32 ch_rate;
 };
 
@@ -132,6 +140,7 @@ struct swr_mstr_ctrl {
 	u8 rcmd_id;
 	u8 wcmd_id;
 	u32 master_id;
+	u32 dynamic_port_map_supported;
 	void *handle; /* SWR Master handle from client for read and writes */
 	int (*read)(void *handle, int reg);
 	int (*write)(void *handle, int reg, int val);
@@ -185,6 +194,11 @@ struct swr_mstr_ctrl {
 	u32 rd_fifo_depth;
 	u32 wr_fifo_depth;
 	bool enable_slave_irq;
+	u64 logical_dev[SWRM_NUM_AUTO_ENUM_SLAVES + 1];
+	u64 phy_dev[SWRM_NUM_AUTO_ENUM_SLAVES + 1];
+	bool use_custom_phy_addr;
+	u32 is_always_on;
+	bool clk_stop_wakeup;
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugfs_swrm_dent;
 	struct dentry *debugfs_peek;

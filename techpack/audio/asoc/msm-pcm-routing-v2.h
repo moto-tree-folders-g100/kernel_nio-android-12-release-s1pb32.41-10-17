@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-/* Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef _MSM_PCM_ROUTING_H
 #define _MSM_PCM_ROUTING_H
@@ -27,6 +28,7 @@
 #define LPASS_BE_INT_FM_TX "INT_FM_TX"
 #define LPASS_BE_AFE_PCM_RX "RT_PROXY_DAI_001_RX"
 #define LPASS_BE_AFE_PCM_TX "RT_PROXY_DAI_002_TX"
+#define LPASS_BE_AFE_PCM_RX1 "RT_PROXY_DAI_003_RX"
 #define LPASS_BE_AUXPCM_RX "AUX_PCM_RX"
 #define LPASS_BE_AUXPCM_TX "AUX_PCM_TX"
 #define LPASS_BE_SEC_AUXPCM_RX "SEC_AUX_PCM_RX"
@@ -81,8 +83,8 @@
 #define LPASS_BE_SLIMBUS_6_TX "SLIMBUS_6_TX"
 #define LPASS_BE_QUIN_MI2S_RX "QUIN_MI2S_RX"
 #define LPASS_BE_QUIN_MI2S_TX "QUIN_MI2S_TX"
-#define LPASS_BE_SENARY_MI2S_TX "SENARY_MI2S_TX"
-#define LPASS_BE_SENARY_MI2S_RX "SENARY_MI2S_RX"
+#define LPASS_BE_SENARY_MI2S_TX "SEN_MI2S_TX"
+#define LPASS_BE_SENARY_MI2S_RX "SEN_MI2S_RX"
 
 #define LPASS_BE_PRI_META_MI2S_RX "PRI_META_MI2S_RX"
 #define LPASS_BE_SEC_META_MI2S_RX "SEC_META_MI2S_RX"
@@ -184,6 +186,71 @@
 #define LPASS_BE_SEN_TDM_TX_6 "SEN_TDM_TX_6"
 #define LPASS_BE_SEN_TDM_RX_7 "SEN_TDM_RX_7"
 #define LPASS_BE_SEN_TDM_TX_7 "SEN_TDM_TX_7"
+#define LPASS_BE_SEP_TDM_RX_0 "SEP_TDM_RX_0"
+#define LPASS_BE_SEP_TDM_TX_0 "SEP_TDM_TX_0"
+#define LPASS_BE_SEP_TDM_RX_1 "SEP_TDM_RX_1"
+#define LPASS_BE_SEP_TDM_TX_1 "SEP_TDM_TX_1"
+#define LPASS_BE_SEP_TDM_RX_2 "SEP_TDM_RX_2"
+#define LPASS_BE_SEP_TDM_TX_2 "SEP_TDM_TX_2"
+#define LPASS_BE_SEP_TDM_RX_3 "SEP_TDM_RX_3"
+#define LPASS_BE_SEP_TDM_TX_3 "SEP_TDM_TX_3"
+#define LPASS_BE_SEP_TDM_RX_4 "SEP_TDM_RX_4"
+#define LPASS_BE_SEP_TDM_TX_4 "SEP_TDM_TX_4"
+#define LPASS_BE_SEP_TDM_RX_5 "SEP_TDM_RX_5"
+#define LPASS_BE_SEP_TDM_TX_5 "SEP_TDM_TX_5"
+#define LPASS_BE_SEP_TDM_RX_6 "SEP_TDM_RX_6"
+#define LPASS_BE_SEP_TDM_TX_6 "SEP_TDM_TX_6"
+#define LPASS_BE_SEP_TDM_RX_7 "SEP_TDM_RX_7"
+#define LPASS_BE_SEP_TDM_TX_7 "SEP_TDM_TX_7"
+
+#define LPASS_BE_HSIF0_TDM_RX_0 "HSIF0_TDM_RX_0"
+#define LPASS_BE_HSIF0_TDM_TX_0 "HSIF0_TDM_TX_0"
+#define LPASS_BE_HSIF0_TDM_RX_1 "HSIF0_TDM_RX_1"
+#define LPASS_BE_HSIF0_TDM_TX_1 "HSIF0_TDM_TX_1"
+#define LPASS_BE_HSIF0_TDM_RX_2 "HSIF0_TDM_RX_2"
+#define LPASS_BE_HSIF0_TDM_TX_2 "HSIF0_TDM_TX_2"
+#define LPASS_BE_HSIF0_TDM_RX_3 "HSIF0_TDM_RX_3"
+#define LPASS_BE_HSIF0_TDM_TX_3 "HSIF0_TDM_TX_3"
+#define LPASS_BE_HSIF0_TDM_RX_4 "HSIF0_TDM_RX_4"
+#define LPASS_BE_HSIF0_TDM_TX_4 "HSIF0_TDM_TX_4"
+#define LPASS_BE_HSIF0_TDM_RX_5 "HSIF0_TDM_RX_5"
+#define LPASS_BE_HSIF0_TDM_TX_5 "HSIF0_TDM_TX_5"
+#define LPASS_BE_HSIF0_TDM_RX_6 "HSIF0_TDM_RX_6"
+#define LPASS_BE_HSIF0_TDM_TX_6 "HSIF0_TDM_TX_6"
+#define LPASS_BE_HSIF0_TDM_RX_7 "HSIF0_TDM_RX_7"
+#define LPASS_BE_HSIF0_TDM_TX_7 "HSIF0_TDM_TX_7"
+#define LPASS_BE_HSIF1_TDM_RX_0 "HSIF1_TDM_RX_0"
+#define LPASS_BE_HSIF1_TDM_TX_0 "HSIF1_TDM_TX_0"
+#define LPASS_BE_HSIF1_TDM_RX_1 "HSIF1_TDM_RX_1"
+#define LPASS_BE_HSIF1_TDM_TX_1 "HSIF1_TDM_TX_1"
+#define LPASS_BE_HSIF1_TDM_RX_2 "HSIF1_TDM_RX_2"
+#define LPASS_BE_HSIF1_TDM_TX_2 "HSIF1_TDM_TX_2"
+#define LPASS_BE_HSIF1_TDM_RX_3 "HSIF1_TDM_RX_3"
+#define LPASS_BE_HSIF1_TDM_TX_3 "HSIF1_TDM_TX_3"
+#define LPASS_BE_HSIF1_TDM_RX_4 "HSIF1_TDM_RX_4"
+#define LPASS_BE_HSIF1_TDM_TX_4 "HSIF1_TDM_TX_4"
+#define LPASS_BE_HSIF1_TDM_RX_5 "HSIF1_TDM_RX_5"
+#define LPASS_BE_HSIF1_TDM_TX_5 "HSIF1_TDM_TX_5"
+#define LPASS_BE_HSIF1_TDM_RX_6 "HSIF1_TDM_RX_6"
+#define LPASS_BE_HSIF1_TDM_TX_6 "HSIF1_TDM_TX_6"
+#define LPASS_BE_HSIF1_TDM_RX_7 "HSIF1_TDM_RX_7"
+#define LPASS_BE_HSIF1_TDM_TX_7 "HSIF1_TDM_TX_7"
+#define LPASS_BE_HSIF2_TDM_RX_0 "HSIF2_TDM_RX_0"
+#define LPASS_BE_HSIF2_TDM_TX_0 "HSIF2_TDM_TX_0"
+#define LPASS_BE_HSIF2_TDM_RX_1 "HSIF2_TDM_RX_1"
+#define LPASS_BE_HSIF2_TDM_TX_1 "HSIF2_TDM_TX_1"
+#define LPASS_BE_HSIF2_TDM_RX_2 "HSIF2_TDM_RX_2"
+#define LPASS_BE_HSIF2_TDM_TX_2 "HSIF2_TDM_TX_2"
+#define LPASS_BE_HSIF2_TDM_RX_3 "HSIF2_TDM_RX_3"
+#define LPASS_BE_HSIF2_TDM_TX_3 "HSIF2_TDM_TX_3"
+#define LPASS_BE_HSIF2_TDM_RX_4 "HSIF2_TDM_RX_4"
+#define LPASS_BE_HSIF2_TDM_TX_4 "HSIF2_TDM_TX_4"
+#define LPASS_BE_HSIF2_TDM_RX_5 "HSIF2_TDM_RX_5"
+#define LPASS_BE_HSIF2_TDM_TX_5 "HSIF2_TDM_TX_5"
+#define LPASS_BE_HSIF2_TDM_RX_6 "HSIF2_TDM_RX_6"
+#define LPASS_BE_HSIF2_TDM_TX_6 "HSIF2_TDM_TX_6"
+#define LPASS_BE_HSIF2_TDM_RX_7 "HSIF2_TDM_RX_7"
+#define LPASS_BE_HSIF2_TDM_TX_7 "HSIF2_TDM_TX_7"
 
 #define LPASS_BE_SLIMBUS_7_RX "SLIMBUS_7_RX"
 #define LPASS_BE_SLIMBUS_7_TX "SLIMBUS_7_TX"
@@ -212,6 +279,7 @@
 
 #define LPASS_BE_WSA_CDC_DMA_RX_0 "WSA_CDC_DMA_RX_0"
 #define LPASS_BE_WSA_CDC_DMA_TX_0 "WSA_CDC_DMA_TX_0"
+#define LPASS_BE_WSA_CDC_DMA_TX_0_VI "WSA_CDC_DMA_TX_0_VI"
 #define LPASS_BE_WSA_CDC_DMA_RX_1 "WSA_CDC_DMA_RX_1"
 #define LPASS_BE_WSA_CDC_DMA_TX_1 "WSA_CDC_DMA_TX_1"
 #define LPASS_BE_WSA_CDC_DMA_TX_2 "WSA_CDC_DMA_TX_2"
@@ -271,6 +339,10 @@ enum {
 	MSM_FRONTEND_DAI_MULTIMEDIA28,
 	MSM_FRONTEND_DAI_MULTIMEDIA29,
 	MSM_FRONTEND_DAI_MULTIMEDIA30,
+	MSM_FRONTEND_DAI_MULTIMEDIA31,
+	MSM_FRONTEND_DAI_MULTIMEDIA32,
+	MSM_FRONTEND_DAI_MULTIMEDIA33,
+	MSM_FRONTEND_DAI_MULTIMEDIA34,
 	MSM_FRONTEND_DAI_VOIP,
 	MSM_FRONTEND_DAI_AFE_RX,
 	MSM_FRONTEND_DAI_AFE_TX,
@@ -292,8 +364,8 @@ enum {
 	MSM_FRONTEND_DAI_MAX,
 };
 
-#define MSM_FRONTEND_DAI_MM_SIZE (MSM_FRONTEND_DAI_MULTIMEDIA30 + 1)
-#define MSM_FRONTEND_DAI_MM_MAX_ID MSM_FRONTEND_DAI_MULTIMEDIA30
+#define MSM_FRONTEND_DAI_MM_SIZE (MSM_FRONTEND_DAI_MAX + 1)
+#define MSM_FRONTEND_DAI_MM_MAX_ID MSM_FRONTEND_DAI_MAX
 
 enum {
 	MSM_BACKEND_DAI_PRI_I2S_RX = 0,
@@ -508,6 +580,71 @@ enum {
 	MSM_BACKEND_DAI_PROXY_RX,
 	MSM_BACKEND_DAI_PROXY_TX,
 	MSM_BACKEND_DAI_HDMI_RX_MS,
+	MSM_BACKEND_DAI_AFE_PCM_RX1,
+	MSM_BACKEND_DAI_SEP_TDM_RX_0,
+	MSM_BACKEND_DAI_SEP_TDM_TX_0,
+	MSM_BACKEND_DAI_SEP_TDM_RX_1,
+	MSM_BACKEND_DAI_SEP_TDM_TX_1,
+	MSM_BACKEND_DAI_SEP_TDM_RX_2,
+	MSM_BACKEND_DAI_SEP_TDM_TX_2,
+	MSM_BACKEND_DAI_SEP_TDM_RX_3,
+	MSM_BACKEND_DAI_SEP_TDM_TX_3,
+	MSM_BACKEND_DAI_SEP_TDM_RX_4,
+	MSM_BACKEND_DAI_SEP_TDM_TX_4,
+	MSM_BACKEND_DAI_SEP_TDM_RX_5,
+	MSM_BACKEND_DAI_SEP_TDM_TX_5,
+	MSM_BACKEND_DAI_SEP_TDM_RX_6,
+	MSM_BACKEND_DAI_SEP_TDM_TX_6,
+	MSM_BACKEND_DAI_SEP_TDM_RX_7,
+	MSM_BACKEND_DAI_SEP_TDM_TX_7,
+	MSM_BACKEND_DAI_HSIF0_TDM_RX_0,
+	MSM_BACKEND_DAI_HSIF0_TDM_TX_0,
+	MSM_BACKEND_DAI_HSIF0_TDM_RX_1,
+	MSM_BACKEND_DAI_HSIF0_TDM_TX_1,
+	MSM_BACKEND_DAI_HSIF0_TDM_RX_2,
+	MSM_BACKEND_DAI_HSIF0_TDM_TX_2,
+	MSM_BACKEND_DAI_HSIF0_TDM_RX_3,
+	MSM_BACKEND_DAI_HSIF0_TDM_TX_3,
+	MSM_BACKEND_DAI_HSIF0_TDM_RX_4,
+	MSM_BACKEND_DAI_HSIF0_TDM_TX_4,
+	MSM_BACKEND_DAI_HSIF0_TDM_RX_5,
+	MSM_BACKEND_DAI_HSIF0_TDM_TX_5,
+	MSM_BACKEND_DAI_HSIF0_TDM_RX_6,
+	MSM_BACKEND_DAI_HSIF0_TDM_TX_6,
+	MSM_BACKEND_DAI_HSIF0_TDM_RX_7,
+	MSM_BACKEND_DAI_HSIF0_TDM_TX_7,
+	MSM_BACKEND_DAI_HSIF1_TDM_RX_0,
+	MSM_BACKEND_DAI_HSIF1_TDM_TX_0,
+	MSM_BACKEND_DAI_HSIF1_TDM_RX_1,
+	MSM_BACKEND_DAI_HSIF1_TDM_TX_1,
+	MSM_BACKEND_DAI_HSIF1_TDM_RX_2,
+	MSM_BACKEND_DAI_HSIF1_TDM_TX_2,
+	MSM_BACKEND_DAI_HSIF1_TDM_RX_3,
+	MSM_BACKEND_DAI_HSIF1_TDM_TX_3,
+	MSM_BACKEND_DAI_HSIF1_TDM_RX_4,
+	MSM_BACKEND_DAI_HSIF1_TDM_TX_4,
+	MSM_BACKEND_DAI_HSIF1_TDM_RX_5,
+	MSM_BACKEND_DAI_HSIF1_TDM_TX_5,
+	MSM_BACKEND_DAI_HSIF1_TDM_RX_6,
+	MSM_BACKEND_DAI_HSIF1_TDM_TX_6,
+	MSM_BACKEND_DAI_HSIF1_TDM_RX_7,
+	MSM_BACKEND_DAI_HSIF1_TDM_TX_7,
+	MSM_BACKEND_DAI_HSIF2_TDM_RX_0,
+	MSM_BACKEND_DAI_HSIF2_TDM_TX_0,
+	MSM_BACKEND_DAI_HSIF2_TDM_RX_1,
+	MSM_BACKEND_DAI_HSIF2_TDM_TX_1,
+	MSM_BACKEND_DAI_HSIF2_TDM_RX_2,
+	MSM_BACKEND_DAI_HSIF2_TDM_TX_2,
+	MSM_BACKEND_DAI_HSIF2_TDM_RX_3,
+	MSM_BACKEND_DAI_HSIF2_TDM_TX_3,
+	MSM_BACKEND_DAI_HSIF2_TDM_RX_4,
+	MSM_BACKEND_DAI_HSIF2_TDM_TX_4,
+	MSM_BACKEND_DAI_HSIF2_TDM_RX_5,
+	MSM_BACKEND_DAI_HSIF2_TDM_TX_5,
+	MSM_BACKEND_DAI_HSIF2_TDM_RX_6,
+	MSM_BACKEND_DAI_HSIF2_TDM_TX_6,
+	MSM_BACKEND_DAI_HSIF2_TDM_RX_7,
+	MSM_BACKEND_DAI_HSIF2_TDM_TX_7,
 	MSM_BACKEND_DAI_MAX,
 };
 
@@ -527,8 +664,7 @@ enum {
 	EXT_EC_REF_SLIM_1_TX,
 	EXT_EC_REF_PRI_TDM_TX,
 	EXT_EC_REF_SEC_TDM_TX,
-	EXT_EC_REF_TERT_TDM_TX,
-	EXT_EC_REF_QUAT_TDM_TX,
+	EXT_EC_REF_SENARY_MI2S_TX,
 };
 
 #define INVALID_SESSION -1
@@ -547,12 +683,15 @@ enum {
 #define ADM_PP_PARAM_MUTE_BIT			1
 #define ADM_PP_PARAM_LATENCY_ID			1
 #define ADM_PP_PARAM_LATENCY_BIT		2
-#define BE_DAI_PORT_SESSIONS_IDX_MAX		4
+#define BE_DAI_PORT_SESSIONS_IDX_MAX		5
 #define BE_DAI_FE_SESSIONS_IDX_MAX		2
 
 #define STREAM_TYPE_ASM 0
 #define STREAM_TYPE_LSM 1
+#define MT_MX_MAX_PORTS 64
 
+#define PP_PERF_MODE_FLAG_MASK                0x10000
+#define PP_PERF_MODE_VALUE_MASK               0xF
 enum {
 	ADM_TOPOLOGY_CAL_TYPE_IDX = 0,
 	ADM_LSM_TOPOLOGY_CAL_TYPE_IDX,
@@ -606,8 +745,18 @@ struct msm_pcm_stream_app_type_cfg {
 	int app_type;
 	int acdb_dev_id;
 	int sample_rate;
+	uint32_t copp_token;
+	int bit_width;
+	int copp_perf_mode;
 };
 
+struct msm_pcm_channel_mixer_v2 {
+	struct msm_pcm_channel_mixer mixer_cfg;
+	int fedai_id;
+	int session_type;
+	int be_id;
+	bool is_used;
+};
 /* dai_id: front-end ID,
  * dspst_id:  DSP audio stream ID
  * stream_type: playback or capture
@@ -655,4 +804,78 @@ int msm_pcm_routing_set_channel_mixer_runtime(
 	int be_id, int session_id,
 	int session_type,
 	struct msm_pcm_channel_mixer *params);
+
+int msm_pcm_routing_set_stream_ec_ref_chmix_cfg(
+	int fedai_id, struct msm_pcm_channel_mixer *cfg_data);
+
+
+/* array element of usr elem */
+struct snd_pcm_soft_vol_usr_elem {
+	int val[3];
+};
+
+/* mixer control information; retrieved via snd_kcontrol_chip() */
+struct snd_pcm_soft_volume {
+	struct snd_pcm *pcm;    /* assigned PCM instance */
+	int stream;             /* PLAYBACK or CAPTURE */
+	struct snd_kcontrol *kctl;   /* contorl handle*/
+	const struct snd_pcm_soft_vol_usr_elem *usr_val;
+	int max_length;
+	void *private_data;
+};
+
+int snd_pcm_add_soft_volume_ctls(struct snd_pcm *pcm, int stream,
+		const struct snd_pcm_soft_vol_usr_elem *soft_vol_params,
+		unsigned long private_value,
+		struct snd_pcm_soft_volume **info_ret);
+#ifndef SND_PCM_ADD_VOLUME_CTL
+/* PCM Volume control API
+ */
+/* array element of volume */
+struct snd_pcm_volume_elem {
+      int volume;
+};
+ /* pp information; retrieved via snd_kcontrol_chip() */
+struct snd_pcm_volume {
+      struct snd_pcm *pcm;    /* assigned PCM instance */
+      int stream;             /* PLAYBACK or CAPTURE */
+      struct snd_kcontrol *kctl;
+      const struct snd_pcm_volume_elem *volume;
+      int max_length;
+      void *private_data;     /* optional: private data pointer */
+};
+
+int snd_pcm_add_volume_ctls(struct snd_pcm *pcm, int stream,
+		const struct snd_pcm_volume_elem *volume,
+		int max_length,
+		unsigned long private_value,
+		struct snd_pcm_volume **info_ret);
+
+#endif
+
+#ifndef SND_PCM_ADD_USR_CTL
+/*
+ * PCM User control API	1450
+ */
+/* array element of usr elem */
+struct snd_pcm_usr_elem {
+	   int val[128];
+};
+
+/* pp information; retrieved via snd_kcontrol_chip() */
+struct snd_pcm_usr {
+   struct snd_pcm *pcm;   /* assigned PCM instance */
+   int stream;      /* PLAYBACK or CAPTURE */
+   struct snd_kcontrol *kctl;
+   const struct snd_pcm_usr_elem *usr;
+   int max_length;
+   void *private_data;   /* optional: private data pointer */
+};
+
+int snd_pcm_add_usr_ctls(struct snd_pcm *pcm, int stream,
+    const struct snd_pcm_usr_elem *usr,
+    int max_length, int max_control_str_len,
+    unsigned long private_value,
+    struct snd_pcm_usr **info_ret);
+#endif
 #endif /*_MSM_PCM_H*/

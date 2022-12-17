@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2011-2017, 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017, 2021, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/compat.h>
@@ -15,7 +15,6 @@
 #include <linux/time.h>
 #include <linux/kmemleak.h>
 #include <linux/mutex.h>
-#include <linux/version.h>
 #include <dsp/apr_audio-v2.h>
 #include "q6usm.h"
 #include "usf.h"
@@ -2370,11 +2369,8 @@ static int usf_open(struct inode *inode, struct file *file)
 	usf = kzalloc(sizeof(struct usf_type), GFP_KERNEL);
 	if (usf == NULL)
 		return -ENOMEM;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 110))
+
 	usf_wakeup_source = wakeup_source_register(NULL, "usf");
-#else
-	usf_wakeup_source = wakeup_source_register("usf");
-#endif
 
 	file->private_data = usf;
 	usf->dev_ind = dev_ind;

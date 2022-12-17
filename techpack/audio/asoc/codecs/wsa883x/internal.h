@@ -60,15 +60,6 @@ enum {
 	SWR_VISENSE_PORT,
 };
 
-enum {
-	BOLERO_WSA_EVT_TX_CH_HOLD_CLEAR = 1,
-	BOLERO_WSA_EVT_PA_OFF_PRE_SSR,
-	BOLERO_WSA_EVT_SSR_DOWN,
-	BOLERO_WSA_EVT_SSR_UP,
-	BOLERO_WSA_EVT_PA_ON_POST_FSCLK,
-	BOLERO_WSA_EVT_PA_ON_POST_FSCLK_ADIE_LB,
-};
-
 struct wsa_ctrl_platform_data {
 	void *handle;
 	int (*update_wsa_event)(void *handle, u16 event, u32 data);
@@ -131,6 +122,9 @@ struct wsa883x_priv {
 	int num_supplies;
 	struct regulator_bulk_data *supplies;
 	unsigned long status_mask;
+	char *wsa883x_name_prefix;
+	struct snd_soc_dai_driver *dai_driver;
+	struct snd_soc_component_driver *driver;
 };
 
 #endif /* WSA883X_INTERNAL_H */

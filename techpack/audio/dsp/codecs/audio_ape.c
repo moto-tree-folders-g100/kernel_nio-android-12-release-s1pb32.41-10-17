@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/types.h>
-#include <linux/msm_audio_ape.h>
+#include <audio/linux/msm_audio_ape.h>
 #include <linux/compat.h>
 #include "audio_utils_aio.h"
 
 static struct miscdevice audio_ape_misc;
 static struct ws_mgr audio_ape_ws_mgr;
-
 #ifdef CONFIG_DEBUG_FS
 static const struct file_operations audio_ape_debug_fops = {
 	.read = audio_aio_debug_read,
@@ -21,7 +20,6 @@ static struct dentry *config_debugfs_create_file(const char *name, void *data)
 			NULL, (void *)data, &audio_ape_debug_fops);
 }
 #endif
-
 static long audio_ioctl_shared(struct file *file, unsigned int cmd,
 						void *arg)
 {
@@ -312,10 +310,10 @@ static int audio_open(struct inode *inode, struct file *file)
 
 	if (IS_ERR_OR_NULL(audio->dentry))
 		pr_debug("debugfs_create_file failed\n");
-#endif
 	pr_debug("%s:apedec success mode[%d]session[%d]\n", __func__,
 						audio->feedback,
 						audio->ac->session);
+#endif
 	return rc;
 fail:
 	q6asm_audio_client_free(audio->ac);

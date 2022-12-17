@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -18,6 +18,7 @@
 #include <linux/firmware.h>
 #include <linux/completion.h>
 #include <linux/soc/qcom/fsa4480-i2c.h>
+#include <linux/usb/typec.h>
 #include <sound/soc.h>
 #include <sound/jack.h>
 #include <asoc/msm-cdc-pinctrl.h>
@@ -26,6 +27,9 @@
 #include "wcd-mbhc-adc.h"
 #include <asoc/wcd-mbhc-v2-api.h>
 
+struct mutex hphl_pa_lock;
+struct mutex hphr_pa_lock;
+
 void wcd_mbhc_jack_report(struct wcd_mbhc *mbhc,
 			  struct snd_soc_jack *jack, int status, int mask)
 {
@@ -33,6 +37,7 @@ void wcd_mbhc_jack_report(struct wcd_mbhc *mbhc,
 }
 EXPORT_SYMBOL(wcd_mbhc_jack_report);
 
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 static void __hphocp_off_report(struct wcd_mbhc *mbhc, u32 jack_status,
 				int irq)
 {
@@ -70,6 +75,7 @@ static void hphlocp_off_report(struct wcd_mbhc *mbhc, u32 jack_status)
 	__hphocp_off_report(mbhc, SND_JACK_OC_HPHL,
 			    mbhc->intr_ids->hph_left_ocp);
 }
+#endif /* CONFIG_AUDIO_QGKI */
 
 static void wcd_program_hs_vref(struct wcd_mbhc *mbhc)
 {
@@ -309,12 +315,14 @@ out_micb_en:
 			mbhc->mbhc_cb->set_cap_mode(component, micbias1, false);
 		break;
 	case WCD_EVENT_PRE_HPHL_PA_OFF:
-		mutex_lock(&mbhc->hphl_pa_lock);
 		break;
 	case WCD_EVENT_POST_HPHL_PA_OFF:
+		mutex_lock(&hphl_pa_lock);
 		clear_bit(WCD_MBHC_HPHL_PA_OFF_ACK, &mbhc->hph_pa_dac_state);
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 		if (mbhc->hph_status & SND_JACK_OC_HPHL)
 			hphlocp_off_report(mbhc, SND_JACK_OC_HPHL);
+#endif /* CONFIG_AUDIO_QGKI */
 		clear_bit(WCD_MBHC_EVENT_PA_HPHL, &mbhc->event_state);
 		/* check if micbias is enabled */
 		if (micbias2)
@@ -323,16 +331,18 @@ out_micb_en:
 		else
 			/* Disable micbias, pullup & enable cs */
 			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_CS);
-		mutex_unlock(&mbhc->hphl_pa_lock);
+		mutex_unlock(&hphl_pa_lock);
 		clear_bit(WCD_MBHC_ANC0_OFF_ACK, &mbhc->hph_anc_state);
 		break;
 	case WCD_EVENT_PRE_HPHR_PA_OFF:
-		mutex_lock(&mbhc->hphr_pa_lock);
 		break;
 	case WCD_EVENT_POST_HPHR_PA_OFF:
+		mutex_lock(&hphr_pa_lock);
 		clear_bit(WCD_MBHC_HPHR_PA_OFF_ACK, &mbhc->hph_pa_dac_state);
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 		if (mbhc->hph_status & SND_JACK_OC_HPHR)
 			hphrocp_off_report(mbhc, SND_JACK_OC_HPHR);
+#endif /* CONFIG_AUDIO_QGKI */
 		clear_bit(WCD_MBHC_EVENT_PA_HPHR, &mbhc->event_state);
 		/* check if micbias is enabled */
 		if (micbias2)
@@ -341,7 +351,7 @@ out_micb_en:
 		else
 			/* Disable micbias, pullup & enable cs */
 			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_CS);
-		mutex_unlock(&mbhc->hphr_pa_lock);
+		mutex_unlock(&hphr_pa_lock);
 		clear_bit(WCD_MBHC_ANC1_OFF_ACK, &mbhc->hph_anc_state);
 		break;
 	case WCD_EVENT_PRE_HPHL_PA_ON:
@@ -412,22 +422,22 @@ static void wcd_mbhc_clr_and_turnon_hph_padac(struct wcd_mbhc *mbhc)
 	WCD_MBHC_REG_READ(WCD_MBHC_HPH_CNP_WG_TIME, wg_time);
 	wg_time += 1;
 
-	mutex_lock(&mbhc->hphr_pa_lock);
+	mutex_lock(&hphr_pa_lock);
 	if (test_and_clear_bit(WCD_MBHC_HPHR_PA_OFF_ACK,
 			       &mbhc->hph_pa_dac_state)) {
 		pr_debug("%s: HPHR clear flag and enable PA\n", __func__);
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_HPHR_PA_EN, 1);
 		pa_turned_on = true;
 	}
-	mutex_unlock(&mbhc->hphr_pa_lock);
-	mutex_lock(&mbhc->hphl_pa_lock);
+	mutex_unlock(&hphr_pa_lock);
+	mutex_lock(&hphl_pa_lock);
 	if (test_and_clear_bit(WCD_MBHC_HPHL_PA_OFF_ACK,
 			       &mbhc->hph_pa_dac_state)) {
 		pr_debug("%s: HPHL clear flag and enable PA\n", __func__);
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_HPHL_PA_EN, 1);
 		pa_turned_on = true;
 	}
-	mutex_unlock(&mbhc->hphl_pa_lock);
+	mutex_unlock(&hphl_pa_lock);
 
 	if (pa_turned_on) {
 		pr_debug("%s: PA was turned on by MBHC and not by DAPM\n",
@@ -599,8 +609,10 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 		wcd_mbhc_jack_report(mbhc, &mbhc->headset_jack,
 				mbhc->hph_status, WCD_MBHC_JACK_MASK);
 		wcd_mbhc_set_and_turnoff_hph_padac(mbhc);
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 		hphrocp_off_report(mbhc, SND_JACK_OC_HPHR);
 		hphlocp_off_report(mbhc, SND_JACK_OC_HPHL);
+#endif /* CONFIG_AUDIO_QGKI */
 		mbhc->current_plug = MBHC_PLUG_TYPE_NONE;
 		mbhc->force_linein = false;
 	} else {
@@ -635,7 +647,7 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 			mbhc->hph_type = WCD_MBHC_HPH_NONE;
 			mbhc->zl = mbhc->zr = 0;
 			if (!mbhc->force_linein) {
-				pr_debug("%s: Reporting removal (%x)\n",
+				pr_info("%s: Reporting removal (%x)\n",
 					 __func__, mbhc->hph_status);
 				wcd_mbhc_jack_report(mbhc, &mbhc->headset_jack,
 					0, WCD_MBHC_JACK_MASK);
@@ -652,10 +664,14 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 						     WCD_MBHC_ELEC_HS_REM,
 						     true);
 			}
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 			mbhc->hph_status &= ~(SND_JACK_HEADSET |
 						SND_JACK_LINEOUT |
-						SND_JACK_ANC_HEADPHONE |
 						SND_JACK_UNSUPPORTED);
+#else
+			mbhc->hph_status &= ~(SND_JACK_HEADSET |
+						SND_JACK_LINEOUT);
+#endif /* CONFIG_AUDIO_QGKI */
 		}
 
 		if (mbhc->current_plug == MBHC_PLUG_TYPE_HEADSET &&
@@ -665,15 +681,18 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 		/* Report insertion */
 		if (jack_type == SND_JACK_HEADPHONE)
 			mbhc->current_plug = MBHC_PLUG_TYPE_HEADPHONE;
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 		else if (jack_type == SND_JACK_UNSUPPORTED)
 			mbhc->current_plug = MBHC_PLUG_TYPE_GND_MIC_SWAP;
+#endif /* CONFIG_AUDIO_QGKI */
 		else if (jack_type == SND_JACK_HEADSET) {
 			mbhc->current_plug = MBHC_PLUG_TYPE_HEADSET;
 			mbhc->jiffies_atreport = jiffies;
-		} else if (jack_type == SND_JACK_LINEOUT) {
+		} else if (jack_type == SND_JACK_LINEOUT)
 			mbhc->current_plug = MBHC_PLUG_TYPE_HIGH_HPH;
-		} else if (jack_type == SND_JACK_ANC_HEADPHONE)
-			mbhc->current_plug = MBHC_PLUG_TYPE_ANC_HEADPHONE;
+		else {
+			pr_warn("%s: invalid Jack type %d\n",__func__, jack_type);
+		}
 
 		if (mbhc->mbhc_cb->hph_pa_on_status)
 			is_pa_on = mbhc->mbhc_cb->hph_pa_on_status(component);
@@ -692,8 +711,9 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 					&mbhc->zl, &mbhc->zr);
 			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_FSM_EN,
 						 fsm_en);
-			pr_info("%s,compute impedance,zl=%d,zr=%d\n",
-                                __func__, mbhc->zl, mbhc->zr);
+			pr_info("%s,compute impedance,zl = %d,zr = %d\n",
+						__func__, mbhc->zl, mbhc->zr);
+
 			if ((mbhc->zl > mbhc->mbhc_cfg->linein_th) &&
 				(mbhc->zr > mbhc->mbhc_cfg->linein_th) &&
 				(jack_type == SND_JACK_HEADPHONE)) {
@@ -701,9 +721,14 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 				mbhc->force_linein = true;
 				mbhc->current_plug = MBHC_PLUG_TYPE_HIGH_HPH;
 				if (mbhc->hph_status) {
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 					mbhc->hph_status &= ~(SND_JACK_HEADSET |
 							SND_JACK_LINEOUT |
 							SND_JACK_UNSUPPORTED);
+#else
+					mbhc->hph_status &= ~(SND_JACK_HEADSET |
+							SND_JACK_LINEOUT);
+#endif /* CONFIG_AUDIO_QGKI */
 					wcd_mbhc_jack_report(mbhc,
 							&mbhc->headset_jack,
 							mbhc->hph_status,
@@ -723,9 +748,14 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 			jack_type = SND_JACK_LINEOUT;
 			mbhc->current_plug = MBHC_PLUG_TYPE_HIGH_HPH;
 			if (mbhc->hph_status) {
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 				mbhc->hph_status &= ~(SND_JACK_HEADSET |
 						SND_JACK_LINEOUT |
 						SND_JACK_UNSUPPORTED);
+#else
+				mbhc->hph_status &= ~(SND_JACK_HEADSET |
+						SND_JACK_LINEOUT);
+#endif /* CONFIG_AUDIO_QGKI */
 				wcd_mbhc_jack_report(mbhc,
 						&mbhc->headset_jack,
 						mbhc->hph_status,
@@ -821,15 +851,15 @@ void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,
 			wcd_mbhc_report_plug(mbhc, 0, SND_JACK_HEADPHONE);
 		if (mbhc->current_plug == MBHC_PLUG_TYPE_HEADSET)
 			wcd_mbhc_report_plug(mbhc, 0, SND_JACK_HEADSET);
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 		wcd_mbhc_report_plug(mbhc, 1, SND_JACK_UNSUPPORTED);
+#endif /* CONFIG_AUDIO_QGKI */
 	} else if (plug_type == MBHC_PLUG_TYPE_HEADSET) {
 		if (mbhc->mbhc_cfg->enable_anc_mic_detect &&
 		    mbhc->mbhc_fn->wcd_mbhc_detect_anc_plug_type)
 			anc_mic_found =
 			mbhc->mbhc_fn->wcd_mbhc_detect_anc_plug_type(mbhc);
 		jack_type = SND_JACK_HEADSET;
-		if (anc_mic_found)
-			jack_type = SND_JACK_ANC_HEADPHONE;
 
 		/*
 		 * If Headphone was reported previously, this will
@@ -921,7 +951,7 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 	WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_MECH_DETECTION_TYPE,
 				 !detection_type);
 
-	pr_debug("%s: mbhc->current_plug: %d detection_type: %d\n", __func__,
+	pr_info("%s: mbhc->current_plug: %d detection_type: %d\n", __func__,
 			mbhc->current_plug, detection_type);
 	if (mbhc->mbhc_fn->wcd_cancel_hs_detect_plug)
 		mbhc->mbhc_fn->wcd_cancel_hs_detect_plug(mbhc,
@@ -994,9 +1024,11 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 		case MBHC_PLUG_TYPE_HEADPHONE:
 			jack_type = SND_JACK_HEADPHONE;
 			break;
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 		case MBHC_PLUG_TYPE_GND_MIC_SWAP:
 			jack_type = SND_JACK_UNSUPPORTED;
 			break;
+#endif /* CONFIG_AUDIO_QGKI */
 		case MBHC_PLUG_TYPE_HEADSET:
 			/* make sure to turn off Rbias */
 			if (mbhc->mbhc_cb->micb_internal)
@@ -1012,13 +1044,14 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 			mbhc->is_extn_cable = false;
 			jack_type = SND_JACK_LINEOUT;
 			break;
-		case MBHC_PLUG_TYPE_ANC_HEADPHONE:
-			jack_type = SND_JACK_ANC_HEADPHONE;
-			break;
 		default:
 			pr_info("%s: Invalid current plug: %d\n",
 				__func__, mbhc->current_plug);
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 			jack_type = SND_JACK_UNSUPPORTED;
+#else
+			jack_type = SND_JACK_HEADPHONE;
+#endif /* CONFIG_AUDIO_QGKI */
 			break;
 		}
 		wcd_mbhc_hs_elec_irq(mbhc, WCD_MBHC_ELEC_HS_REM, false);
@@ -1130,7 +1163,7 @@ static void wcd_btn_lpress_fn(struct work_struct *work)
 
 	WCD_MBHC_REG_READ(WCD_MBHC_BTN_RESULT, btn_result);
 	if (mbhc->current_plug == MBHC_PLUG_TYPE_HEADSET) {
-		pr_debug("%s: Reporting long button press event, btn_result: %d\n",
+		pr_info("%s: Reporting long button press event, btn_result: %d\n",
 			 __func__, btn_result);
 		wcd_mbhc_jack_report(mbhc, &mbhc->button_jack,
 				mbhc->buttons_pressed, mbhc->buttons_pressed);
@@ -1249,8 +1282,8 @@ static irqreturn_t wcd_mbhc_release_handler(int irq, void *data)
 	if (mbhc->buttons_pressed & WCD_MBHC_JACK_BUTTON_MASK) {
 		ret = wcd_cancel_btn_work(mbhc);
 		if (ret == 0) {
-			pr_info("%s: Reporting long button release event\n",
-				 __func__);
+			pr_info("%s: Reporting long button release event 0x%x\n",
+				 __func__, mbhc->buttons_pressed);
 			wcd_mbhc_jack_report(mbhc, &mbhc->button_jack,
 					0, mbhc->buttons_pressed);
 		} else {
@@ -1258,7 +1291,7 @@ static irqreturn_t wcd_mbhc_release_handler(int irq, void *data)
 				pr_debug("%s: Switch irq kicked in, ignore\n",
 					__func__);
 			} else {
-				pr_info("%s: Reporting btn press %x\n",
+				pr_info("%s: Reporting btn press 0x%x\n",
 					 __func__, mbhc->buttons_pressed);
 				wcd_mbhc_jack_report(mbhc,
 						     &mbhc->button_jack,
@@ -1306,7 +1339,9 @@ static irqreturn_t wcd_mbhc_hphl_ocp_irq(int irq, void *data)
 			mbhc->mbhc_cb->irq_control(mbhc->component,
 						   mbhc->intr_ids->hph_left_ocp,
 						   false);
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 			mbhc->hph_status |= SND_JACK_OC_HPHL;
+#endif /* CONFIG_AUDIO_QGKI */
 			wcd_mbhc_jack_report(mbhc, &mbhc->headset_jack,
 					    mbhc->hph_status,
 					    WCD_MBHC_JACK_MASK);
@@ -1349,7 +1384,9 @@ static irqreturn_t wcd_mbhc_hphr_ocp_irq(int irq, void *data)
 		mbhc->mbhc_cb->irq_control(mbhc->component,
 					   mbhc->intr_ids->hph_right_ocp,
 					   false);
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 		mbhc->hph_status |= SND_JACK_OC_HPHR;
+#endif /* CONFIG_AUDIO_QGKI */
 		wcd_mbhc_jack_report(mbhc, &mbhc->headset_jack,
 				    mbhc->hph_status, WCD_MBHC_JACK_MASK);
 	}
@@ -1586,6 +1623,7 @@ static int wcd_mbhc_set_keycode(struct wcd_mbhc *mbhc)
 	return result;
 }
 
+#if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
 static int wcd_mbhc_usbc_ana_event_handler(struct notifier_block *nb,
 					   unsigned long mode, void *ptr)
 {
@@ -1594,9 +1632,9 @@ static int wcd_mbhc_usbc_ana_event_handler(struct notifier_block *nb,
 	if (!mbhc)
 		return -EINVAL;
 
-	dev_dbg(mbhc->component->dev, "%s: mode = %lu\n", __func__, mode);
+	dev_info(mbhc->component->dev, "%s: mode = %lu\n", __func__, mode);
 
-	if (mode == POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER) {
+	if (mode == TYPEC_ACCESSORY_AUDIO) {
 		if (mbhc->mbhc_cb->clk_setup)
 			mbhc->mbhc_cb->clk_setup(mbhc->component, true);
 		/* insertion detected, enable L_DET_EN */
@@ -1604,6 +1642,13 @@ static int wcd_mbhc_usbc_ana_event_handler(struct notifier_block *nb,
 	}
 	return 0;
 }
+#else
+static int wcd_mbhc_usbc_ana_event_handler(struct notifier_block *nb,
+					   unsigned long mode, void *ptr)
+{
+	return 0;
+}
+#endif
 
 int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 {
@@ -1611,6 +1656,7 @@ int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 	struct snd_soc_component *component;
 	struct snd_soc_card *card;
 	const char *usb_c_dt = "qcom,msm-mbhc-usbc-audio-supported";
+	const char *linein_th = "qcom,msm-hs-linein-threshold";
 
 	if (!mbhc || !mbhc_cfg)
 		return -EINVAL;
@@ -1636,6 +1682,12 @@ int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 		dev_dbg(card->dev,
 			"%s: skipping USB c analog configuration\n", __func__);
 	}
+
+	if (of_find_property(card->dev->of_node, linein_th, NULL)) {
+		rc = of_property_read_u32(card->dev->of_node, linein_th,
+				&mbhc->mbhc_cfg->linein_th);
+	}
+	pr_info("%s, LINEIN threshold = %d\n", __func__, mbhc->mbhc_cfg->linein_th);
 
 	/* Parse fsa switch handle */
 	if (mbhc_cfg->enable_usbc_analog) {
@@ -1856,8 +1908,6 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_component *component,
 				  wcd_mbhc_fw_read);
 		INIT_DELAYED_WORK(&mbhc->mbhc_btn_dwork, wcd_btn_lpress_fn);
 	}
-	mutex_init(&mbhc->hphl_pa_lock);
-	mutex_init(&mbhc->hphr_pa_lock);
 	init_completion(&mbhc->btn_press_compl);
 
 	/* Register event notifier */
@@ -2028,18 +2078,20 @@ void wcd_mbhc_deinit(struct wcd_mbhc *mbhc)
 		WCD_MBHC_RSC_UNLOCK(mbhc);
 	}
 	mutex_destroy(&mbhc->codec_resource_lock);
-	mutex_destroy(&mbhc->hphl_pa_lock);
-	mutex_destroy(&mbhc->hphr_pa_lock);
 }
 EXPORT_SYMBOL(wcd_mbhc_deinit);
 
 static int __init mbhc_init(void)
 {
+	mutex_init(&hphl_pa_lock);
+	mutex_init(&hphr_pa_lock);
 	return 0;
 }
 
 static void __exit mbhc_exit(void)
 {
+	mutex_destroy(&hphl_pa_lock);
+	mutex_destroy(&hphr_pa_lock);
 }
 
 module_init(mbhc_init);

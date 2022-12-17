@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -27,7 +27,7 @@
 #include <asm/dma.h>
 #include <sound/tlv.h>
 #include <sound/pcm_params.h>
-#include <sound/devdep_params.h>
+#include <audio/sound/devdep_params.h>
 #include <dsp/msm_audio_ion.h>
 #include <dsp/q6audio-v2.h>
 
@@ -153,6 +153,8 @@ static const struct soc_enum msm_pcm_fe_topology_enum[] = {
 static void event_handler(uint32_t opcode,
 		uint32_t token, uint32_t *payload, void *priv)
 {
+	struct msm_audio *prtd = priv;
+	struct snd_pcm_substream *substream;
 	uint32_t *ptrmem = (uint32_t *)payload;
 
 	switch (opcode) {
@@ -170,6 +172,18 @@ static void event_handler(uint32_t opcode,
 		default:
 			break;
 		}
+		break;
+	case RESET_EVENTS:
+		if (!prtd || !prtd->substream) {
+			pr_err("%s: prtd or substream is NULL\n", __func__);
+			return;
+		}
+		substream = prtd->substream;
+		if (!substream->runtime || !substream->runtime->status) {
+			pr_err("%s: runtime or runtime->status is NULL\n", __func__);
+			return;
+		}
+		substream->runtime->status->state = SNDRV_PCM_STATE_DISCONNECTED;
 		break;
 	default:
 		pr_debug("Not Supported Event opcode[0x%x]\n", opcode);
@@ -353,6 +367,7 @@ static int msm_pcm_hw_params(struct snd_pcm_substream *substream,
 	config.bufsz = params_buffer_bytes(params) / params_periods(params);
 	config.bufcnt = params_periods(params);
 
+	prtd->audio_client->fedai_id = soc_prtd->dai_link->id;
 	ret = q6asm_open_shared_io(prtd->audio_client, &config, dir,
 				   use_default_chmap, chmap);
 	if (ret) {
@@ -444,7 +459,7 @@ static int msm_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	return ret;
 }
 
-
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 static int msm_pcm_mmap_fd(struct snd_pcm_substream *substream,
 			   struct snd_pcm_mmap_fd *mmap_fd)
 {
@@ -500,6 +515,7 @@ static int msm_pcm_mmap_fd(struct snd_pcm_substream *substream,
 buf_fd_fail:
         return rc;
 }
+#endif /* CONFIG_AUDIO_QGKI */
 
 static int msm_pcm_ioctl(struct snd_pcm_substream *substream,
 			 unsigned int cmd, void *arg)
@@ -525,7 +541,7 @@ static int msm_pcm_ioctl(struct snd_pcm_substream *substream,
 	return snd_pcm_lib_ioctl(substream, cmd, arg);
 }
 
-#ifdef CONFIG_COMPAT
+#if IS_ENABLED(CONFIG_COMPAT) && IS_ENABLED(CONFIG_AUDIO_QGKI)
 static int msm_pcm_compat_ioctl(struct snd_pcm_substream *substream,
 				unsigned int cmd, void *arg)
 {
@@ -699,6 +715,7 @@ static int msm_pcm_close(struct snd_pcm_substream *substream)
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 static int msm_pcm_set_volume(struct msm_audio *prtd, uint32_t volume)
 {
 	int rc = 0;
@@ -840,6 +857,13 @@ static int msm_pcm_add_volume_control(struct snd_soc_pcm_runtime *rtd,
 	kctl->tlv.p = msm_pcm_vol_gain;
 	return 0;
 }
+#else
+static int msm_pcm_add_volume_control(struct snd_soc_pcm_runtime *rtd,
+				      int stream)
+{
+	return 0;
+}
+#endif /* CONFIG_AUDIO_QGKI */
 
 static int msm_pcm_channel_map_put(struct snd_kcontrol *kcontrol,
 				     struct snd_ctl_elem_value *ucontrol)
@@ -942,7 +966,7 @@ static int msm_pcm_add_channel_map_control(struct snd_soc_pcm_runtime *rtd)
 
 	pr_debug("%s: added new pcm FE with name %s, id %d, cpu dai %s, device no %d\n",
 		 __func__, rtd->dai_link->name, rtd->dai_link->id,
-		 rtd->dai_link->cpu_dai_name, rtd->pcm->device);
+		 rtd->dai_link->cpus->dai_name, rtd->pcm->device);
 
 	ctl_len = strlen(mixer_ctl_name) + strlen(deviceNo) + 1;
 	mixer_str = kzalloc(ctl_len, GFP_KERNEL);
@@ -1065,6 +1089,7 @@ static int msm_pcm_add_fe_topology_control(struct snd_soc_pcm_runtime *rtd)
 	return ret;
 }
 
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 static int msm_pcm_playback_app_type_cfg_ctl_put(struct snd_kcontrol *kcontrol,
 				      struct snd_ctl_elem_value *ucontrol)
 {
@@ -1222,7 +1247,14 @@ static int msm_pcm_add_app_type_controls(struct snd_soc_pcm_runtime *rtd)
 
 	return 0;
 }
+#else
+static int msm_pcm_add_app_type_controls(struct snd_soc_pcm_runtime *rtd)
+{
+	return 0;
+}
+#endif /* CONFIG_AUDIO_QGKI */
 
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 static int msm_pcm_hwdep_ioctl(struct snd_hwdep *hw, struct file *file,
 			       unsigned int cmd, unsigned long arg)
 {
@@ -1318,6 +1350,12 @@ static int msm_pcm_add_hwdep_dev(struct snd_soc_pcm_runtime *runtime)
 	hwdep->ops.ioctl_compat = msm_pcm_hwdep_compat_ioctl;
 	return 0;
 }
+#else
+static int msm_pcm_add_hwdep_dev(struct snd_soc_pcm_runtime *runtime)
+{
+	return 0;
+}
+#endif /* CONFIG_AUDIO_GKI */
 
 static int msm_asoc_pcm_new(struct snd_soc_pcm_runtime *rtd)
 {
@@ -1370,7 +1408,7 @@ static const struct snd_pcm_ops msm_pcm_ops = {
 	.copy_user      = msm_pcm_copy,
 	.hw_params	= msm_pcm_hw_params,
 	.ioctl          = msm_pcm_ioctl,
-#ifdef CONFIG_COMPAT
+#if IS_ENABLED(CONFIG_COMPAT) && IS_ENABLED(CONFIG_AUDIO_QGKI)
 	.compat_ioctl   = msm_pcm_compat_ioctl,
 #endif
 	.trigger        = msm_pcm_trigger,

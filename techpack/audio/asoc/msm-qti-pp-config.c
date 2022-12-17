@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/err.h>
@@ -7,7 +7,6 @@
 #include <linux/bitops.h>
 #include <linux/mutex.h>
 #include <sound/control.h>
-#include <sound/asound.h>
 #include <sound/tlv.h>
 #include <dsp/q6adm-v2.h>
 #include <dsp/q6asm-v2.h>
@@ -175,7 +174,7 @@ static int msm_qti_pp_put_dtmf_module_enable
 	struct audio_client *ac = NULL;
 	struct param_hdr_v3 param_hdr;
 	int ret = 0;
-	u32 flag = ucontrol->value.integer.value[0];
+	u32 flag = (bool)ucontrol->value.integer.value[0];
 
 	fe_id = ((struct soc_multi_mixer_control *)
 			kcontrol->private_value)->shift;
@@ -444,7 +443,7 @@ int msm_qti_pp_send_chmix_cfg_cmd(int port_id, int copp_idx,
 	int16_t *update_params_value16 = 0;
 	uint32_t param_size = msm_qti_pp_get_chmix_param_size(ip_channel_cnt,
 				op_channel_cnt);
-	struct param_hdr_v3 *param_hdr;
+	struct param_hdr_v1 *param_hdr;
 
 	/* constant payload data size represents module_id, param_id,
 	 * param size, reserved field.
@@ -460,9 +459,8 @@ int msm_qti_pp_send_chmix_cfg_cmd(int port_id, int copp_idx,
 
 	param_ptr = params_value;
 
-	param_hdr = (struct param_hdr_v3 *) param_ptr;
+	param_hdr = (struct param_hdr_v1 *) param_ptr;
 	param_hdr->module_id = MTMX_MODULE_ID_DEFAULT_CHMIXER;
-	param_hdr->instance_id = INSTANCE_ID_0;
 	param_hdr->param_id = DEFAULT_CHMIXER_PARAM_ID_COEFF;
 	param_hdr->param_size = param_size;
 
@@ -537,7 +535,7 @@ static int msm_qti_pp_get_rms_value_control(struct snd_kcontrol *kcontrol,
 			break;
 	}
 	if ((be_idx >= MSM_BACKEND_DAI_MAX) || !msm_bedai.active) {
-		pr_err("%s, back not active to query rms be_idx:%d\n",
+		pr_debug("%s, back not active to query rms be_idx:%d\n",
 			__func__, be_idx);
 		rc = -EINVAL;
 		goto get_rms_value_err;
@@ -580,6 +578,7 @@ static int msm_qti_pp_put_rms_value_control(struct snd_kcontrol *kcontrol,
 }
 
 /* VOLUME */
+static int msm_route_dp_vol_control;
 static int msm_route_fm_vol_control;
 static int msm_afe_lb_vol_ctrl;
 static int msm_afe_sec_mi2s_lb_vol_ctrl;
@@ -590,6 +589,24 @@ static int msm_afe_slimbus_8_lb_vol_ctrl;
 static int msm_asm_bit_width;
 static const DECLARE_TLV_DB_LINEAR(fm_rx_vol_gain, 0, INT_RX_VOL_MAX_STEPS);
 static const DECLARE_TLV_DB_LINEAR(afe_lb_vol_gain, 0, INT_RX_VOL_MAX_STEPS);
+
+
+static int msm_qti_pp_get_dp_vol_mixer(struct snd_kcontrol *kcontrol,
+				       struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] = msm_route_dp_vol_control;
+	return 0;
+}
+
+static int msm_qti_pp_set_dp_vol_mixer(struct snd_kcontrol *kcontrol,
+			    struct snd_ctl_elem_value *ucontrol)
+{
+	afe_loopback_gain(AFE_PORT_ID_TX_CODEC_DMA_TX_3, ucontrol->value.integer.value[0]);
+
+	msm_route_dp_vol_control = ucontrol->value.integer.value[0];
+
+	return 0;
+}
 
 static int msm_qti_pp_get_fm_vol_mixer(struct snd_kcontrol *kcontrol,
 				       struct snd_ctl_elem_value *ucontrol)
@@ -1201,7 +1218,7 @@ int msm_adsp_inform_mixer_ctl(struct snd_soc_pcm_runtime *rtd,
 	int ctl_len = 0, ret = 0;
 	struct dsp_stream_callback_list *new_event;
 	struct dsp_stream_callback_list *oldest_event;
-	unsigned long spin_flags;
+	unsigned long spin_flags = 0;
 	struct dsp_stream_callback_prtd *kctl_prtd = NULL;
 	struct msm_adsp_event_data *event_data = NULL;
 	const char *mixer_ctl_name = DSP_STREAM_CALLBACK;
@@ -1238,13 +1255,6 @@ int msm_adsp_inform_mixer_ctl(struct snd_soc_pcm_runtime *rtd,
 	}
 
 	event_data = (struct msm_adsp_event_data *)payload;
-	if (event_data->payload_len < sizeof(struct msm_adsp_event_data)) {
-		pr_err("%s: event_data size of %x is less than expected.\n",
-			__func__, event_data->payload_len);
-		ret = -EINVAL;
-		goto done;
-	}
-
 	kctl->info(kctl, &kctl_info);
 
 	if (event_data->payload_len >
@@ -1277,11 +1287,11 @@ int msm_adsp_inform_mixer_ctl(struct snd_soc_pcm_runtime *rtd,
 
 	spin_lock_irqsave(&kctl_prtd->prtd_spin_lock, spin_flags);
 	while (kctl_prtd->event_count >= DSP_STREAM_CALLBACK_QUEUE_SIZE) {
-		pr_info("%s: queue of size %d is full. delete oldest one.\n",
+		pr_debug("%s: queue of size %d is full. delete oldest one.\n",
 			__func__, DSP_STREAM_CALLBACK_QUEUE_SIZE);
 		oldest_event = list_first_entry(&kctl_prtd->event_queue,
 				struct dsp_stream_callback_list, list);
-		pr_info("%s: event deleted: type %d length %d\n",
+		pr_debug("%s: event deleted: type %d length %d\n",
 			__func__, oldest_event->event.event_type,
 			oldest_event->event.payload_len);
 		list_del(&oldest_event->list);
@@ -1317,7 +1327,7 @@ int msm_adsp_stream_callback_get(struct snd_kcontrol *kcontrol,
 {
 	uint32_t payload_size = 0;
 	struct dsp_stream_callback_list *oldest_event;
-	unsigned long spin_flags;
+	unsigned long spin_flags = 0;
 	struct dsp_stream_callback_prtd *kctl_prtd = NULL;
 	int ret = 0;
 
@@ -1446,6 +1456,12 @@ static SOC_ENUM_SINGLE_EXT_DECL(ffecns_effect_enum, ffecns_effect_text);
 static const struct snd_kcontrol_new ec_ffecns_controls[] = {
 	SOC_ENUM_EXT("FFECNS Effect", ffecns_effect_enum,
 		msm_ffecns_get, msm_ffecns_put),
+};
+
+static const struct snd_kcontrol_new int_dp_vol_mixer_controls[] = {
+	SOC_SINGLE_EXT_TLV("DISPLAY_PORT Loopback Volume", SND_SOC_NOPM, 0,
+	INT_RX_VOL_GAIN, 0, msm_qti_pp_get_dp_vol_mixer,
+	msm_qti_pp_set_dp_vol_mixer, afe_lb_vol_gain),
 };
 
 static const struct snd_kcontrol_new int_fm_vol_mixer_controls[] = {
@@ -1700,6 +1716,9 @@ static const struct snd_kcontrol_new dtmf_detect_enable_mixer_controls[] = {
 #ifdef CONFIG_QTI_PP
 void msm_qti_pp_add_controls(struct snd_soc_component *component)
 {
+	snd_soc_add_component_controls(component, int_dp_vol_mixer_controls,
+			ARRAY_SIZE(int_dp_vol_mixer_controls));
+
 	snd_soc_add_component_controls(component, int_fm_vol_mixer_controls,
 			ARRAY_SIZE(int_fm_vol_mixer_controls));
 

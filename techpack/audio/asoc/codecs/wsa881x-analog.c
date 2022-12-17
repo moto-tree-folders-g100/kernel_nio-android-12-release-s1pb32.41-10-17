@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2015-2016, 2018-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2016, 2018-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -34,6 +35,20 @@
 
 #define SPK_GAIN_12DB 4
 #define WIDGET_NAME_MAX_SIZE 80
+#define REGMAP_REGISTER_CHECK_RETRY 30
+
+#define MAX_NAME_LEN 30
+#define WSA881X_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |\
+			SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_48000 |\
+			SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_192000 |\
+			SNDRV_PCM_RATE_384000)
+/* Fractional Rates */
+#define WSA881X_FRAC_RATES (SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_88200 |\
+				SNDRV_PCM_RATE_176400 | SNDRV_PCM_RATE_352800)
+
+#define WSA881X_FORMATS (SNDRV_PCM_FMTBIT_S16_LE |\
+			SNDRV_PCM_FMTBIT_S24_LE |\
+			SNDRV_PCM_FMTBIT_S24_3LE | SNDRV_PCM_FMTBIT_S32_LE)
 
 /*
  * Private data Structure for wsa881x. All parameters related to
@@ -66,6 +81,9 @@ struct wsa881x_pdata {
 	struct device_node *wsa_vi_gpio_p;
 	struct device_node *wsa_clk_gpio_p;
 	struct device_node *wsa_reset_gpio_p;
+	char *wsa881x_name_prefix;
+	struct snd_soc_dai_driver *dai_driver;
+	struct snd_soc_component_driver *driver;
 };
 
 enum {
@@ -86,7 +104,7 @@ static int32_t wsa881x_resource_acquire(struct snd_soc_component *component,
 
 const char *wsa_tz_names[] = {"wsa881x.0e", "wsa881x.0f"};
 
-struct wsa881x_pdata wsa_pdata[MAX_WSA881X_DEVICE];
+static struct wsa881x_pdata wsa_pdata[MAX_WSA881X_DEVICE];
 
 static bool pinctrl_init;
 
@@ -256,7 +274,8 @@ static int wsa881x_i2c_read_device(struct wsa881x_pdata *wsa881x,
 		}
 		pr_debug("read success reg = %x val = %x\n",
 						reg, val);
-	} else {
+	} else if (wsa881x->client[wsa881x_index]) {
+
 		reg_addr = (u8)reg;
 		msg = &wsa881x->xfer_msg[0];
 		msg->addr = wsa881x->client[wsa881x_index]->addr;
@@ -284,6 +303,9 @@ static int wsa881x_i2c_read_device(struct wsa881x_pdata *wsa881x,
 			}
 		}
 		val = dest[0];
+	} else {
+		pr_err("failed for i2c client is not initilized\n");
+		return -EINVAL;
 	}
 	return val;
 }
@@ -550,7 +572,6 @@ static void wsa881x_bandgap_ctrl(struct snd_soc_component *component,
 	} else {
 		--wsa881x->bg_cnt;
 		if (wsa881x->bg_cnt <= 0) {
-			WARN_ON(wsa881x->bg_cnt < 0);
 			wsa881x->bg_cnt = 0;
 			snd_soc_component_update_bits(component,
 						WSA881X_TEMP_OP, 0x04, 0x00);
@@ -588,7 +609,6 @@ static void wsa881x_clk_ctrl(struct snd_soc_component *component, bool enable)
 	} else {
 		--wsa881x->clk_cnt;
 		if (wsa881x->clk_cnt <= 0) {
-			WARN_ON(wsa881x->clk_cnt < 0);
 			wsa881x->clk_cnt = 0;
 			snd_soc_component_write(component,
 					WSA881X_CDC_ANA_CLK_CTL, 0x00);
@@ -790,7 +810,40 @@ static int wsa881x_set_visense(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int wsa881x_get_t0_init(struct snd_kcontrol *kcontrol,
+							struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component =
+					snd_soc_kcontrol_component(kcontrol);
+	struct wsa881x_pdata *wsa881x =
+					snd_soc_component_get_drvdata(component);
+	struct wsa881x_tz_priv *pdata = &wsa881x->tz_pdata;
+
+	ucontrol->value.integer.value[0] = pdata->t0_init;
+	dev_dbg(component->dev, "%s: t0 init %d\n", __func__, pdata->t0_init);
+
+	return 0;
+}
+
+static int wsa881x_set_t0_init(struct snd_kcontrol *kcontrol,
+							struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component =
+					snd_soc_kcontrol_component(kcontrol);
+	struct wsa881x_pdata *wsa881x =
+					snd_soc_component_get_drvdata(component);
+	struct wsa881x_tz_priv *pdata = &wsa881x->tz_pdata;
+
+	pdata->t0_init = ucontrol->value.integer.value[0];
+	dev_dbg(component->dev, "%s: t0 init %d\n", __func__, pdata->t0_init);
+
+	return 0;
+}
+
 static const struct snd_kcontrol_new wsa881x_snd_controls[] = {
+	SOC_SINGLE_EXT("WSA T0 Init", SND_SOC_NOPM, 0, 1, 0,
+		wsa881x_get_t0_init, wsa881x_set_t0_init),
+
 	SOC_SINGLE_EXT("BOOST Switch", SND_SOC_NOPM, 0, 1, 0,
 		wsa881x_get_boost, wsa881x_set_boost),
 
@@ -907,7 +960,7 @@ static void wsa881x_ocp_ctl_work(struct work_struct *work)
 	struct wsa881x_pdata *wsa881x;
 	struct delayed_work *dwork;
 	struct snd_soc_component *component;
-	int temp_val;
+	int temp_val = 0;
 
 	dwork = to_delayed_work(work);
 	wsa881x = container_of(dwork, struct wsa881x_pdata, ocp_ctl_work);
@@ -1128,12 +1181,11 @@ static int wsa881x_probe(struct snd_soc_component *component)
 {
 	struct i2c_client *client;
 	int ret = 0;
+	int retry = REGMAP_REGISTER_CHECK_RETRY;
 	int wsa881x_index = 0;
 	struct snd_soc_dapm_context *dapm =
 					snd_soc_component_get_dapm(component);
 	char *widget_name = NULL;
-	struct snd_soc_card *card = component->card;
-	struct snd_soc_codec_conf *codec_conf = card->codec_conf;
 
 	client = dev_get_drvdata(component->dev);
 	ret = wsa881x_i2c_get_client_index(client, &wsa881x_index);
@@ -1153,21 +1205,32 @@ static int wsa881x_probe(struct snd_soc_component *component)
 	wsa_pdata[wsa881x_index].tz_pdata.wsa_temp_reg_read =
 						wsa881x_temp_reg_read;
 	snd_soc_component_set_drvdata(component, &wsa_pdata[wsa881x_index]);
+	while (retry) {
+		if (wsa_pdata[wsa881x_index].regmap_flag)
+			break;
+		msleep(100);
+		retry--;
+	}
+	if (!retry) {
+		dev_err(&client->dev, "%s: max retry expired and regmap of\n"
+				"analog slave not initilized\n", __func__);
+		return -EPROBE_DEFER;
+	}
 	wsa881x_init_thermal(&wsa_pdata[wsa881x_index].tz_pdata);
 	INIT_DELAYED_WORK(&wsa_pdata[wsa881x_index].ocp_ctl_work,
 				wsa881x_ocp_ctl_work);
 
-	if (codec_conf->name_prefix) {
+	if (component->name_prefix) {
 		widget_name = kcalloc(WIDGET_NAME_MAX_SIZE, sizeof(char),
 					GFP_KERNEL);
 		if (!widget_name)
 			return -ENOMEM;
 
 		snprintf(widget_name, WIDGET_NAME_MAX_SIZE,
-			"%s WSA_SPKR", codec_conf->name_prefix);
+			"%s WSA_SPKR", component->name_prefix);
 		snd_soc_dapm_ignore_suspend(dapm, widget_name);
 		snprintf(widget_name, WIDGET_NAME_MAX_SIZE,
-			"%s WSA_IN", codec_conf->name_prefix);
+			"%s WSA_IN", component->name_prefix);
 		snd_soc_dapm_ignore_suspend(dapm, widget_name);
 		kfree(widget_name);
 	} else {
@@ -1192,7 +1255,8 @@ static void wsa881x_remove(struct snd_soc_component *component)
 	mutex_destroy(&wsa881x->res_lock);
 }
 
-static const struct snd_soc_component_driver soc_component_dev_wsa881x = {
+static const struct snd_soc_component_driver soc_codec_dev_wsa881x = {
+	.name = "",
 	.probe	= wsa881x_probe,
 	.remove	= wsa881x_remove,
 
@@ -1205,6 +1269,21 @@ static const struct snd_soc_component_driver soc_component_dev_wsa881x = {
 	.num_dapm_widgets = ARRAY_SIZE(wsa881x_dapm_widgets),
 	.dapm_routes = wsa881x_audio_map,
 	.num_dapm_routes = ARRAY_SIZE(wsa881x_audio_map),
+};
+
+static struct snd_soc_dai_driver wsa_dai[] = {
+	{
+		.name = "",
+		.playback = {
+			.stream_name = "",
+			.rates = WSA881X_RATES | WSA881X_FRAC_RATES,
+			.formats = WSA881X_FORMATS,
+			.rate_max = 192000,
+			.rate_min = 8000,
+			.channels_min = 1,
+			.channels_max = 2,
+			},
+	},
 };
 
 static int wsa881x_reset(struct wsa881x_pdata *pdata, bool enable)
@@ -1334,6 +1413,9 @@ static int wsa881x_i2c_probe(struct i2c_client *client,
 	int wsa881x_index = 0;
 	struct wsa881x_pdata *pdata = NULL;
 	struct clk *wsa_mclk = NULL;
+	char buffer[MAX_NAME_LEN];
+	const char *wsa881x_name_prefix_of = NULL;
+	struct snd_soc_component *component;
 
 	ret = wsa881x_i2c_get_client_index(client, &wsa881x_index);
 	if (ret != 0) {
@@ -1351,9 +1433,9 @@ static int wsa881x_i2c_probe(struct i2c_client *client,
 	}
 
 	if (pdata->status == WSA881X_STATUS_I2C) {
-		dev_dbg(&client->dev, "%s:probe for other slaves\n"
-			"devices of codec I2C slave Addr = %x\n",
-			__func__, client->addr);
+		dev_info(&client->dev, "%s:probe for other slaves\n"
+			"devices of codec I2C slave Addr = %x wsa_idx = %d\n",
+			__func__, client->addr, wsa881x_index);
 		dev_dbg(&client->dev, "%s:wsa_idx = %d SLAVE = %d\n",
 				__func__, wsa881x_index, WSA881X_ANALOG_SLAVE);
 		pdata->regmap[WSA881X_ANALOG_SLAVE] =
@@ -1371,6 +1453,7 @@ static int wsa881x_i2c_probe(struct i2c_client *client,
 		client->dev.platform_data = pdata;
 		i2c_set_clientdata(client, pdata);
 		pdata->client[WSA881X_ANALOG_SLAVE] = client;
+		pdata->regmap_flag = true;
 		if (pdata->version == WSA881X_2_0)
 			wsa881x_update_regmap_2_0(
 					pdata->regmap[WSA881X_ANALOG_SLAVE],
@@ -1436,7 +1519,6 @@ static int wsa881x_i2c_probe(struct i2c_client *client,
 			goto err;
 		}
 		pdata->client[WSA881X_DIGITAL_SLAVE] = client;
-		pdata->regmap_flag = true;
 		ret = check_wsa881x_presence(client);
 		if (ret < 0) {
 			dev_err(&client->dev,
@@ -1456,13 +1538,86 @@ static int wsa881x_i2c_probe(struct i2c_client *client,
 		}
 		wsa881x_presence_count++;
 		wsa881x_probing_count++;
-		ret = snd_soc_register_component(&client->dev,
-					&soc_component_dev_wsa881x,
-					NULL, 0);
-		if (ret < 0)
+
+		ret = of_property_read_string(client->dev.of_node,
+				"qcom,wsa-prefix", &wsa881x_name_prefix_of);
+		if (ret) {
+			dev_err(&client->dev,
+				"%s: Looking up %s property in node %s failed\n",
+				__func__, "qcom,wsa-prefix",
+				client->dev.of_node->full_name);
 			goto err1;
+		}
+
+		pdata->driver = devm_kzalloc(&client->dev,
+					sizeof(struct snd_soc_component_driver),
+					GFP_KERNEL);
+		if (!pdata->driver) {
+			ret = -ENOMEM;
+			goto err1;
+		}
+
+		memcpy(pdata->driver, &soc_codec_dev_wsa881x,
+				sizeof(struct snd_soc_component_driver));
+
+		pdata->dai_driver = devm_kzalloc(&client->dev,
+					sizeof(struct snd_soc_dai_driver),
+					GFP_KERNEL);
+		if (!pdata->dai_driver) {
+			ret = -ENOMEM;
+			goto err_mem;
+		}
+
+		memcpy(pdata->dai_driver, wsa_dai,
+			sizeof(struct snd_soc_dai_driver));
+
+		snprintf(buffer, sizeof(buffer), "wsa-codec%d", wsa881x_index);
+		pdata->driver->name = kstrndup(buffer,
+					       strlen(buffer), GFP_KERNEL);
+
+		snprintf(buffer, sizeof(buffer), "wsa_rx%d", wsa881x_index);
+		pdata->dai_driver->name =
+				kstrndup(buffer, strlen(buffer), GFP_KERNEL);
+
+		snprintf(buffer, sizeof(buffer),
+			 "WSA881X_AIF%d Playback", wsa881x_index);
+		pdata->dai_driver->playback.stream_name =
+				kstrndup(buffer, strlen(buffer), GFP_KERNEL);
+
+		/* Number of DAI's used is 1 */
+		ret = snd_soc_register_component(&client->dev,
+					pdata->driver, pdata->dai_driver, 1);
+
+
+		pdata->wsa881x_name_prefix = kstrndup(wsa881x_name_prefix_of,
+			strlen(wsa881x_name_prefix_of), GFP_KERNEL);
+
+		component = snd_soc_lookup_component(&client->dev, pdata->driver->name);
+		if (!component) {
+			dev_err(&client->dev, "%s: component is NULL \n", __func__);
+			ret = -EINVAL;
+			goto err_mem;
+		}
+
+		component->name_prefix = pdata->wsa881x_name_prefix;
+
 		pdata->status = WSA881X_STATUS_I2C;
+		dev_info(&client->dev, "%s:pdata status changed to I2C\n",
+			__func__);
+		goto err1;
 	}
+err_mem:
+	 kfree(pdata->wsa881x_name_prefix);
+	if (pdata->dai_driver) {
+		kfree(pdata->dai_driver->name);
+		kfree(pdata->dai_driver->playback.stream_name);
+		kfree(pdata->dai_driver);
+	}
+	if (pdata->driver) {
+		kfree(pdata->driver->name);
+		kfree(pdata->driver);
+	}
+
 err1:
 	wsa881x_reset(pdata, false);
 err:
@@ -1474,6 +1629,16 @@ static int wsa881x_i2c_remove(struct i2c_client *client)
 	struct wsa881x_pdata *wsa881x = client->dev.platform_data;
 
 	snd_soc_unregister_component(&client->dev);
+	kfree(wsa881x->wsa881x_name_prefix);
+	if (wsa881x->dai_driver) {
+		kfree(wsa881x->dai_driver->name);
+		kfree(wsa881x->dai_driver->playback.stream_name);
+		kfree(wsa881x->dai_driver);
+	}
+	if (wsa881x->driver) {
+		kfree(wsa881x->driver->name);
+		kfree(wsa881x->driver);
+	}
 	i2c_set_clientdata(client, NULL);
 	kfree(wsa881x);
 	return 0;

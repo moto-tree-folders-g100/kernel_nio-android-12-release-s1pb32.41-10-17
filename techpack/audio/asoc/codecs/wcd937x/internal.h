@@ -9,6 +9,7 @@
 #include <asoc/wcd-mbhc-v2.h>
 #include <asoc/wcd-irq.h>
 #include "wcd937x-mbhc.h"
+#include "wcd937x.h"
 
 #define WCD937X_MAX_MICBIAS 3
 
@@ -18,6 +19,7 @@
 #define MAX_CH_PER_PORT 8
 #define MAX_TX_PWR_CH 2
 
+#define WCD937X_MAX_SLAVE_PORT_TYPES 10
 extern struct regmap_config wcd937x_regmap_config;
 
 struct codec_port_info {
@@ -88,6 +90,7 @@ struct wcd937x_priv {
 	int ear_rx_path;
 	int ana_clk_count;
 	struct mutex ana_tx_clk_lock;
+	u8 tx_master_ch_map[WCD937X_MAX_SLAVE_CH_TYPES];
 	bool usbc_hs_status;
 	u32 tx_ch_pwr[MAX_TX_PWR_CH];
 };
@@ -123,21 +126,6 @@ enum {
 	WCD_RX1,
 	WCD_RX2,
 	WCD_RX3
-};
-
-enum {
-	BOLERO_WCD_EVT_TX_CH_HOLD_CLEAR = 1,
-	BOLERO_WCD_EVT_PA_OFF_PRE_SSR,
-	BOLERO_WCD_EVT_SSR_DOWN,
-	BOLERO_WCD_EVT_SSR_UP,
-};
-
-enum {
-	WCD_BOLERO_EVT_RX_MUTE = 1,	/* for RX mute/unmute */
-	WCD_BOLERO_EVT_IMPED_TRUE,	/* for imped true */
-	WCD_BOLERO_EVT_IMPED_FALSE,	/* for imped false */
-	WCD_BOLERO_EVT_RX_COMPANDER_SOFT_RST,
-	WCD_BOLERO_EVT_BCS_CLK_OFF,
 };
 
 enum {

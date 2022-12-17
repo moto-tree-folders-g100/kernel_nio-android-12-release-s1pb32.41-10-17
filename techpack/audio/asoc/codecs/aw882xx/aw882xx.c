@@ -1,7 +1,7 @@
 /*
  * aw882xx.c   aw882xx codec module
  *
- * Version: v0.1.17
+ * Version: v0.1.18
  *
  * keep same with AW882XX_VERSION
  *
@@ -66,6 +66,8 @@
 #define CALI_BUF_MAX 100
 #define DELAY_TIME_MAX 300
 #define AWINIC_CALI_FILE  "/mnt/vendor/persist/factory/audio/aw_cali.bin"
+
+static DEFINE_MUTEX(g_msg_dsp_lock);
 
 #ifdef CONFIG_AW882XX_DSP
 extern int aw_send_afe_cal_apr(uint32_t rx_port_id, uint32_t tx_port_id,
@@ -580,10 +582,10 @@ static int aw882xx_get_cali_re_from_nv(uint32_t *cali_re)
 	}
 	/*set fs kernel*/
 	fs = get_fs();
-	set_fs(get_ds());
+	set_fs(KERNEL_DS);
 
 	/*read file*/
-	vfs_read(fp, buf, CALI_BUF_MAX - 1, &pos);
+	kernel_read(fp, buf, CALI_BUF_MAX - 1, &pos);
 
 	/*get cali re value*/
 	if (sscanf(buf, "%d", &read_re) != 1) {
@@ -1230,7 +1232,7 @@ static int aw882xx_skt_disable_get(struct snd_kcontrol *kcontrol,
 
 static int aw882xx_skt_set_dsp(int value)
 {
-	int ret;
+        int ret;
 	int port_id = g_aw882xx->afe_rx_portid;
 	int module_id = AW_MODULE_ID_COPP;
 	int param_id =  AW_MODULE_PARAMS_ID_COPP_ENABLE;
@@ -2495,6 +2497,163 @@ static ssize_t aw882xx_temp_show(struct device *dev,
 	return len;
 }
 #endif
+
+static int aw_write_msg_to_dsp(struct aw882xx *aw882xx, int inline_id,
+			char *data, int data_size)
+{
+	int32_t *dsp_msg = NULL;
+	struct aw_dsp_msg_hdr *hdr = NULL;
+	int ret;
+
+	dsp_msg = kzalloc(sizeof(struct aw_dsp_msg_hdr) + data_size,
+			GFP_KERNEL);
+	if (!dsp_msg) {
+		pr_err("%s: inline_id:0x%x kzalloc dsp_msg error\n",
+			__func__, inline_id);
+		return -ENOMEM;
+	}
+	hdr = (struct aw_dsp_msg_hdr *)dsp_msg;
+	hdr->type = DSP_MSG_TYPE_DATA;
+	hdr->opcode_id = inline_id;
+	hdr->version = AWINIC_DSP_MSG_HDR_VER;
+
+	memcpy(((char *)dsp_msg) + sizeof(struct aw_dsp_msg_hdr),
+		data, data_size);
+
+	ret = aw_send_afe_cal_apr(aw882xx->afe_rx_portid, aw882xx->afe_tx_portid,
+				AFE_PARAM_ID_AWDSP_RX_MSG, (void *)dsp_msg,
+				sizeof(struct aw_dsp_msg_hdr) + data_size, true);
+	if (ret < 0) {
+		pr_err("%s:inline_id:0x%x, write data failed\n",
+			__func__, inline_id);
+		kfree(dsp_msg);
+		dsp_msg = NULL;
+		return ret;
+	}
+
+	kfree(dsp_msg);
+	dsp_msg = NULL;
+	return 0;
+}
+
+static int aw_read_msg_from_dsp(struct aw882xx *aw882xx, int inline_id,
+			char *data, int data_size)
+{
+	struct aw_dsp_msg_hdr dsp_msg;
+	int ret;
+
+	dsp_msg.type = DSP_MSG_TYPE_CMD;
+	dsp_msg.opcode_id = inline_id;
+	dsp_msg.version = AWINIC_DSP_MSG_HDR_VER;
+
+	mutex_lock(&g_msg_dsp_lock);
+	ret = aw_send_afe_cal_apr(aw882xx->afe_rx_portid, aw882xx->afe_tx_portid,
+			AFE_PARAM_ID_AWDSP_RX_MSG,
+			&dsp_msg, sizeof(struct aw_dsp_msg_hdr), true);
+	if (ret < 0) {
+		pr_err("%s:inline_id:0x%x, write cmd to dsp failed\n",
+			__func__, inline_id);
+		goto dsp_msg_failed;
+	}
+
+	ret = aw_send_afe_cal_apr(aw882xx->afe_rx_portid, aw882xx->afe_tx_portid,
+			AFE_PARAM_ID_AWDSP_RX_MSG,
+			data, data_size, false);
+	if (ret < 0) {
+		pr_err("%s:inline_id:0x%x, read data from dsp failed\n",
+			__func__, inline_id);
+		goto dsp_msg_failed;
+	}
+
+	mutex_unlock(&g_msg_dsp_lock);
+	return 0;
+
+dsp_msg_failed:
+	mutex_unlock(&g_msg_dsp_lock);
+	return ret;
+}
+
+static int aw_misc_ops_read_dsp(struct aw882xx *aw882xx, aw_ioctl_msg_t *msg)
+{
+	char __user* user_data = (char __user*)msg->data_buf;
+	uint32_t dsp_msg_id = (uint32_t)msg->opcode_id;
+	int data_len = msg->data_len;
+	int ret;
+	char *data_ptr;
+
+	data_ptr = kmalloc(data_len, GFP_KERNEL);
+	if (!data_ptr) {
+		pr_err("%s : malloc failed !\n", __func__);
+		return -ENOMEM;
+	}
+
+	ret = aw_read_msg_from_dsp(aw882xx, dsp_msg_id, data_ptr, data_len);
+	if (ret) {
+		pr_err("%s : write failed\n", __func__);
+		goto exit;
+	}
+
+	if (copy_to_user((void __user *)user_data,
+		data_ptr, data_len)) {
+		ret = -EFAULT;
+	}
+exit:
+	kfree(data_ptr);
+	return ret;
+}
+
+static int aw_misc_ops_write_dsp(struct aw882xx *aw882xx, aw_ioctl_msg_t *msg)
+{
+	char __user* user_data = (char __user*)msg->data_buf;
+	uint32_t dsp_msg_id = (uint32_t)msg->opcode_id;
+	int data_len = msg->data_len;
+	int ret;
+	char *data_ptr;
+
+	data_ptr = kmalloc(data_len, GFP_KERNEL);
+	if (!data_ptr) {
+		pr_err("%s : malloc failed !\n", __func__);
+		return -ENOMEM;
+	}
+
+	if (copy_from_user(data_ptr, (void __user *)user_data, data_len)) {
+		pr_err("%s : copy data failed\n", __func__);
+		ret = -EFAULT;
+		goto exit;
+	}
+
+	ret = aw_write_msg_to_dsp(aw882xx, dsp_msg_id, data_ptr, data_len);
+	if (ret) {
+		pr_err("%s : write failed\n", __func__);
+	}
+exit:
+	kfree(data_ptr);
+	return ret;
+}
+
+static int aw_misc_ops_msg(struct aw882xx *aw882xx, unsigned long arg)
+{
+	aw_ioctl_msg_t ioctl_msg;
+
+	if (copy_from_user(&ioctl_msg, (void __user *)arg, sizeof(aw_ioctl_msg_t))) {
+		return -EFAULT;
+	}
+
+	if(ioctl_msg.version != AW_IOCTL_MSG_VERSION) {
+		pr_err("%s:unsupported msg version %d\n", __func__, ioctl_msg.version);
+		return -EINVAL;
+	}
+
+	if (ioctl_msg.type == AW_IOCTL_MSG_RD_DSP) {
+		return aw_misc_ops_read_dsp(aw882xx, &ioctl_msg);
+	} else if (ioctl_msg.type == AW_IOCTL_MSG_WR_DSP) {
+		return aw_misc_ops_write_dsp(aw882xx, &ioctl_msg);
+	} else {
+		pr_err("%s:unsupported msg type %d\n", __func__, ioctl_msg.type);
+		return -EINVAL;
+	}
+}
+
 static int aw882xx_cali_operation(struct aw882xx *aw882xx,
 			unsigned int cmd, unsigned long arg)
 {
@@ -2735,6 +2894,11 @@ static int aw882xx_cali_operation(struct aw882xx *aw882xx,
 			kfree(p_data);
 			p_data = NULL;
 		} break;
+		case AW882XX_IOCTL_MSG:
+			ret = aw_misc_ops_msg(aw882xx, arg);
+			if (ret < 0)
+				goto exit;
+			break;
 		default: {
 			pr_err("%s : cmd %d\n", __func__, cmd);
 		} break;
@@ -3527,7 +3691,6 @@ static struct i2c_driver aw882xx_i2c_driver = {
 	.id_table = aw882xx_i2c_id,
 };
 
-
 static int __init aw882xx_i2c_init(void)
 {
 	int ret = -1;
@@ -3540,6 +3703,11 @@ static int __init aw882xx_i2c_init(void)
 
 	return ret;
 }
+
+#if KERNEL_VERSION(5, 4, 0) <= LINUX_VERSION_CODE
+MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+#endif
+
 module_init(aw882xx_i2c_init);
 
 

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _WCD938X_INTERNAL_H
@@ -10,6 +11,7 @@
 #include <asoc/wcd-irq.h>
 #include <asoc/wcd-clsh.h>
 #include "wcd938x-mbhc.h"
+#include "wcd938x.h"
 
 #define SWR_SCP_CONTROL    0x44
 #define SWR_SCP_HOST_CLK_DIV2_CTL_BANK 0xE0
@@ -55,6 +57,7 @@ struct wcd938x_priv {
 	struct device_node *wcd_rst_np;
 
 	struct mutex micb_lock;
+	struct mutex wakeup_lock;
 	s32 dmic_0_1_clk_cnt;
 	s32 dmic_2_3_clk_cnt;
 	s32 dmic_4_5_clk_cnt;
@@ -67,6 +70,7 @@ struct wcd938x_priv {
 
 	u32 hph_mode;
 	u32 tx_mode[TX_ADC_MAX];
+	s32 adc_count;
 	bool comp1_enable;
 	bool comp2_enable;
 	bool ldoh;
@@ -102,7 +106,12 @@ struct wcd938x_priv {
 	int flyback_cur_det_disable;
 	int ear_rx_path;
 	bool dev_up;
+	u8 tx_master_ch_map[WCD938X_MAX_SLAVE_CH_TYPES];
 	bool usbc_hs_status;
+	/* wcd to swr dmic notification */
+	bool notify_swr_dmic;
+	struct blocking_notifier_head notifier;
+	int micb_enabled[WCD938X_MAX_MICBIAS];
 };
 
 struct wcd938x_micbias_setting {
@@ -137,22 +146,6 @@ enum {
 	WCD_RX1,
 	WCD_RX2,
 	WCD_RX3
-};
-
-enum {
-	BOLERO_WCD_EVT_TX_CH_HOLD_CLEAR = 1,
-	BOLERO_WCD_EVT_PA_OFF_PRE_SSR,
-	BOLERO_WCD_EVT_SSR_DOWN,
-	BOLERO_WCD_EVT_SSR_UP,
-	BOLERO_WCD_EVT_CLK_NOTIFY,
-};
-
-enum {
-	WCD_BOLERO_EVT_RX_MUTE = 1,	/* for RX mute/unmute */
-	WCD_BOLERO_EVT_IMPED_TRUE,	/* for imped true */
-	WCD_BOLERO_EVT_IMPED_FALSE,	/* for imped false */
-	WCD_BOLERO_EVT_RX_COMPANDER_SOFT_RST,
-	WCD_BOLERO_EVT_BCS_CLK_OFF,
 };
 
 enum {

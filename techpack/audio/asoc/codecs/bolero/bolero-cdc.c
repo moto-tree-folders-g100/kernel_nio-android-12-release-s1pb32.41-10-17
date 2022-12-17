@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/of_platform.h>
@@ -15,9 +15,11 @@
 #include <linux/pm_runtime.h>
 #include <soc/swr-common.h>
 #include <dsp/digital-cdc-rsc-mgr.h>
+#include <linux/ratelimit.h>
 #include "bolero-cdc.h"
 #include "internal.h"
 #include "bolero-clk-rsc.h"
+#include "asoc/bolero-slave-internal.h"
 
 #define DRV_NAME "bolero_codec"
 
@@ -202,49 +204,52 @@ static int bolero_cdc_update_wcd_event(void *handle, u16 event, u32 data)
 	}
 
 	switch (event) {
-	case WCD_BOLERO_EVT_RX_MUTE:
+	case SLV_BOLERO_EVT_RX_MUTE:
 		if (priv->macro_params[RX_MACRO].event_handler)
 			priv->macro_params[RX_MACRO].event_handler(
 				priv->component,
 				BOLERO_MACRO_EVT_RX_MUTE, data);
 		break;
-	case WCD_BOLERO_EVT_IMPED_TRUE:
+	case SLV_BOLERO_EVT_IMPED_TRUE:
 		if (priv->macro_params[RX_MACRO].event_handler)
 			priv->macro_params[RX_MACRO].event_handler(
 				priv->component,
 				BOLERO_MACRO_EVT_IMPED_TRUE, data);
 		break;
-	case WCD_BOLERO_EVT_IMPED_FALSE:
+	case SLV_BOLERO_EVT_IMPED_FALSE:
 		if (priv->macro_params[RX_MACRO].event_handler)
 			priv->macro_params[RX_MACRO].event_handler(
 				priv->component,
 				BOLERO_MACRO_EVT_IMPED_FALSE, data);
 		break;
-	case WCD_BOLERO_EVT_RX_COMPANDER_SOFT_RST:
+	case SLV_BOLERO_EVT_RX_COMPANDER_SOFT_RST:
 		if (priv->macro_params[RX_MACRO].event_handler)
 			priv->macro_params[RX_MACRO].event_handler(
 				priv->component,
 				BOLERO_MACRO_EVT_RX_COMPANDER_SOFT_RST, data);
 		break;
-	case WCD_BOLERO_EVT_BCS_CLK_OFF:
+	case SLV_BOLERO_EVT_BCS_CLK_OFF:
 		if (priv->macro_params[TX_MACRO].event_handler)
 			priv->macro_params[TX_MACRO].event_handler(
 				priv->component,
 				BOLERO_MACRO_EVT_BCS_CLK_OFF, data);
 		break;
-	case WCD_BOLERO_EVT_RX_PA_GAIN_UPDATE:
-		if (priv->macro_params[RX_MACRO].event_handler)
-			priv->macro_params[RX_MACRO].event_handler(
-				priv->component,
-				BOLERO_MACRO_EVT_RX_PA_GAIN_UPDATE, data);
+	case SLV_BOLERO_EVT_RX_PA_GAIN_UPDATE:
+		/* Update PA Gain only for bolero version 2.1 */
+		if (priv->version == BOLERO_VERSION_2_1)
+			if (priv->macro_params[RX_MACRO].event_handler)
+				priv->macro_params[RX_MACRO].event_handler(
+					priv->component,
+					BOLERO_MACRO_EVT_RX_PA_GAIN_UPDATE,
+					data);
 		break;
-	case WCD_BOLERO_EVT_HPHL_HD2_ENABLE:
+	case SLV_BOLERO_EVT_HPHL_HD2_ENABLE:
 		if (priv->macro_params[RX_MACRO].event_handler)
 			priv->macro_params[RX_MACRO].event_handler(
 				priv->component,
 				BOLERO_MACRO_EVT_HPHL_HD2_ENABLE, data);
 		break;
-	case WCD_BOLERO_EVT_HPHR_HD2_ENABLE:
+	case SLV_BOLERO_EVT_HPHR_HD2_ENABLE:
 		if (priv->macro_params[RX_MACRO].event_handler)
 			priv->macro_params[RX_MACRO].event_handler(
 				priv->component,
@@ -326,7 +331,7 @@ void bolero_clear_amic_tx_hold(struct device *dev, u16 adc_n)
 		dev_err(dev, "%s: priv is null\n", __func__);
 		return;
 	}
-	event = BOLERO_WCD_EVT_TX_CH_HOLD_CLEAR;
+	event = BOLERO_SLV_EVT_TX_CH_HOLD_CLEAR;
 	if (adc_n == BOLERO_ADC0)
 		amic = 0x1;
 	else if (adc_n == BOLERO_ADC1)
@@ -504,7 +509,7 @@ static u8 bolero_dmic_clk_div_get(struct snd_soc_component *component,
 
 	if (priv->macro_params[macro].clk_div_get) {
 		ret = priv->macro_params[macro].clk_div_get(component);
-		if (ret > 0)
+		if (ret >= 0)
 			return ret;
 	}
 
@@ -697,6 +702,7 @@ int bolero_register_macro(struct device *dev, u16 macro_id,
 			priv->macro_params[macro_id].reg_wake_irq =
 						ops->reg_wake_irq;
 	}
+	mutex_lock(&priv->macro_lock);
 	priv->num_dais += ops->num_dais;
 	priv->num_macros_registered++;
 	priv->macros_supported[macro_id] = true;
@@ -707,6 +713,7 @@ int bolero_register_macro(struct device *dev, u16 macro_id,
 		ret = bolero_copy_dais_from_macro(priv);
 		if (ret < 0) {
 			dev_err(dev, "%s: copy_dais failed\n", __func__);
+			mutex_unlock(&priv->macro_lock);
 			return ret;
 		}
 		if (priv->macros_supported[TX_MACRO] == false) {
@@ -719,9 +726,11 @@ int bolero_register_macro(struct device *dev, u16 macro_id,
 				priv->bolero_dais, priv->num_dais);
 		if (ret < 0) {
 			dev_err(dev, "%s: register codec failed\n", __func__);
+			mutex_unlock(&priv->macro_lock);
 			return ret;
 		}
 	}
+	mutex_unlock(&priv->macro_lock);
 	return 0;
 }
 EXPORT_SYMBOL(bolero_register_macro);
@@ -795,10 +804,10 @@ void bolero_wsa_pa_on(struct device *dev, bool adie_lb)
 	}
 	if (adie_lb)
 		bolero_cdc_notifier_call(priv,
-			BOLERO_WCD_EVT_PA_ON_POST_FSCLK_ADIE_LB);
+			BOLERO_SLV_EVT_PA_ON_POST_FSCLK_ADIE_LB);
 	else
 		bolero_cdc_notifier_call(priv,
-			BOLERO_WCD_EVT_PA_ON_POST_FSCLK);
+			BOLERO_SLV_EVT_PA_ON_POST_FSCLK);
 }
 EXPORT_SYMBOL(bolero_wsa_pa_on);
 
@@ -849,6 +858,9 @@ static ssize_t bolero_version_read(struct snd_info_entry *entry,
 		break;
 	case BOLERO_VERSION_1_2:
 		len = snprintf(buffer, sizeof(buffer), "BOLERO_1_2\n");
+		break;
+	case BOLERO_VERSION_2_0:
+		len = snprintf(buffer, sizeof(buffer), "BOLERO_2_0\n");
 		break;
 	case BOLERO_VERSION_2_1:
 		len = snprintf(buffer, sizeof(buffer), "BOLERO_2_1\n");
@@ -912,7 +924,7 @@ static int bolero_ssr_enable(struct device *dev, void *data)
 			BOLERO_MACRO_EVT_SSR_UP, 0x0);
 	}
 	trace_printk("%s: SSR up events processed by all macros\n", __func__);
-	bolero_cdc_notifier_call(priv, BOLERO_WCD_EVT_SSR_UP);
+	bolero_cdc_notifier_call(priv, BOLERO_SLV_EVT_SSR_UP);
 	return 0;
 }
 
@@ -927,7 +939,7 @@ static void bolero_ssr_disable(struct device *dev, void *data)
 		return;
 	}
 
-	bolero_cdc_notifier_call(priv, BOLERO_WCD_EVT_PA_OFF_PRE_SSR);
+	bolero_cdc_notifier_call(priv, BOLERO_SLV_EVT_PA_OFF_PRE_SSR);
 	regcache_cache_only(priv->regmap, true);
 
 	mutex_lock(&priv->clk_lock);
@@ -943,7 +955,7 @@ static void bolero_ssr_disable(struct device *dev, void *data)
 			priv->component,
 			BOLERO_MACRO_EVT_SSR_DOWN, 0x0);
 	}
-	bolero_cdc_notifier_call(priv, BOLERO_WCD_EVT_SSR_DOWN);
+	bolero_cdc_notifier_call(priv, BOLERO_SLV_EVT_SSR_DOWN);
 }
 
 static struct snd_info_entry_ops bolero_info_ops = {
@@ -982,19 +994,26 @@ int bolero_info_create_codec_entry(struct snd_info_entry *codec_root,
 		return 0;
 	}
 	card = component->card;
-	priv->entry = snd_info_create_subdir(codec_root->module,
+	priv->entry = snd_info_create_module_entry(codec_root->module,
 					     "bolero", codec_root);
 	if (!priv->entry) {
 		dev_dbg(component->dev, "%s: failed to create bolero entry\n",
 			__func__);
 		return -ENOMEM;
 	}
+	priv->entry->mode = S_IFDIR | 0555;
+	if (snd_info_register(priv->entry) < 0) {
+		snd_info_free_entry(priv->entry);
+		return -ENOMEM;
+	}
+
 	version_entry = snd_info_create_card_entry(card->snd_card,
 						   "version",
 						   priv->entry);
 	if (!version_entry) {
 		dev_err(component->dev, "%s: failed to create bolero version entry\n",
 			__func__);
+		snd_info_free_entry(priv->entry);
 		return -ENOMEM;
 	}
 
@@ -1005,6 +1024,7 @@ int bolero_info_create_codec_entry(struct snd_info_entry *codec_root,
 
 	if (snd_info_register(version_entry) < 0) {
 		snd_info_free_entry(version_entry);
+		snd_info_free_entry(priv->entry);
 		return -ENOMEM;
 	}
 	priv->version_entry = version_entry;
@@ -1057,7 +1077,7 @@ EXPORT_SYMBOL(bolero_register_wake_irq);
  *
  * @component: pointer to codec component instance.
  *
- * @clk_src: 0 for TX_RCG and 1 for VA_RCG
+ * @clk_src: clk source
  *
  * Returns 0 on success or -EINVAL on error.
  */
@@ -1159,6 +1179,7 @@ static int bolero_soc_codec_probe(struct snd_soc_component *component)
 {
 	struct bolero_priv *priv = dev_get_drvdata(component->dev);
 	int macro_idx, ret = 0;
+	u8 core_id_0 = 0, core_id_1 = 0;
 
 	snd_soc_component_init_regmap(component, priv->regmap);
 
@@ -1178,11 +1199,14 @@ static int bolero_soc_codec_probe(struct snd_soc_component *component)
 			priv->version = BOLERO_VERSION_1_2;
 	}
 
-	/* Assign bolero version 2.1 for bolero 2.1 */
-	if ((snd_soc_component_read32(component,
-		BOLERO_CDC_VA_TOP_CSR_CORE_ID_0) == 0x2) &&
-		(snd_soc_component_read32(component,
-			BOLERO_CDC_VA_TOP_CSR_CORE_ID_1) == 0xE))
+	/* Assign bolero version */
+	core_id_0 = snd_soc_component_read32(component,
+					BOLERO_CDC_VA_TOP_CSR_CORE_ID_0);
+	core_id_1 = snd_soc_component_read32(component,
+					BOLERO_CDC_VA_TOP_CSR_CORE_ID_1);
+	if ((core_id_0 == 0x01) && (core_id_1 == 0x0F))
+		priv->version = BOLERO_VERSION_2_0;
+	if ((core_id_0 == 0x02) && (core_id_1 == 0x0E))
 		priv->version = BOLERO_VERSION_2_1;
 
 	/* call init for supported macros */
@@ -1354,6 +1378,7 @@ static int bolero_probe(struct platform_device *pdev)
 		bolero_reg_access[VA_MACRO] = bolero_va_reg_access_v3;
 	}
 
+	BLOCKING_INIT_NOTIFIER_HEAD(&priv->notifier);
 	priv->dev = &pdev->dev;
 	priv->dev_up = true;
 	priv->initial_boot = true;
@@ -1374,12 +1399,12 @@ static int bolero_probe(struct platform_device *pdev)
 	priv->core_audio_vote_count = 0;
 
 	dev_set_drvdata(&pdev->dev, priv);
+	mutex_init(&priv->macro_lock);
 	mutex_init(&priv->io_lock);
 	mutex_init(&priv->clk_lock);
 	mutex_init(&priv->vote_lock);
 	INIT_WORK(&priv->bolero_add_child_devices_work,
 		  bolero_add_child_devices);
-	schedule_work(&priv->bolero_add_child_devices_work);
 
 	/* Register LPASS core hw vote */
 	lpass_core_hw_vote = devm_clk_get(&pdev->dev, "lpass_core_hw_vote");
@@ -1403,6 +1428,7 @@ static int bolero_probe(struct platform_device *pdev)
 	}
 	priv->lpass_audio_hw_vote = lpass_audio_hw_vote;
 
+	schedule_work(&priv->bolero_add_child_devices_work);
 	return 0;
 }
 
@@ -1414,6 +1440,7 @@ static int bolero_remove(struct platform_device *pdev)
 		return -EINVAL;
 
 	of_platform_depopulate(&pdev->dev);
+	mutex_destroy(&priv->macro_lock);
 	mutex_destroy(&priv->io_lock);
 	mutex_destroy(&priv->clk_lock);
 	mutex_destroy(&priv->vote_lock);
@@ -1425,6 +1452,7 @@ int bolero_runtime_resume(struct device *dev)
 {
 	struct bolero_priv *priv = dev_get_drvdata(dev->parent);
 	int ret = 0;
+	static DEFINE_RATELIMIT_STATE(rtl, 1 * HZ, 1);
 
 	mutex_lock(&priv->vote_lock);
 	if (priv->lpass_core_hw_vote == NULL) {
@@ -1453,8 +1481,9 @@ audio_vote:
 	if (priv->core_audio_vote_count == 0) {
 		ret = digital_cdc_rsc_mgr_hw_vote_enable(priv->lpass_audio_hw_vote);
 		if (ret < 0) {
-			dev_err(dev, "%s:lpass audio hw enable failed\n",
-				__func__);
+			if (__ratelimit(&rtl))
+				dev_err(dev, "%s:lpass audio hw enable failed\n",
+					__func__);
 			goto done;
 		}
 	}

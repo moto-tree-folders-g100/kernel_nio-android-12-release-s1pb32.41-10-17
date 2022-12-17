@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2016-2017, 2019-2020 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2017, 2019-2021 The Linux Foundation. All rights reserved.
  */
 
 #include <linux/types.h>
-#include <linux/msm_audio_g711_dec.h>
+#include <audio/linux/msm_audio_g711_dec.h>
 #include <linux/compat.h>
 #include "audio_utils_aio.h"
 
@@ -285,10 +285,10 @@ static int audio_open(struct inode *inode, struct file *file)
 
 	if (IS_ERR_OR_NULL(audio->dentry))
 		pr_debug("%s: debugfs_create_file failed\n", __func__);
-#endif
 	pr_debug("%s: g711dec success mode[%d]session[%d]\n", __func__,
 						audio->feedback,
 						audio->ac->session);
+#endif
 	return rc;
 fail:
 	q6asm_audio_client_free(audio->ac);

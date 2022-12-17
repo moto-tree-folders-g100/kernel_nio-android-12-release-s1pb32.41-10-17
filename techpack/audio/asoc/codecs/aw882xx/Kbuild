@@ -1,11 +1,9 @@
 # add -Wall to try to catch everything we can.
 EXTRA_CFLAGS += -Wall
-EXTRA_CFLAGS += -I$(TOP)/vendor/qcom/opensource/audio-kernel/include
-EXTRA_CFLAGS += -I$(TOP)/vendor/qcom/opensource/audio-kernel/include/uapi/
+EXTRA_CFLAGS += -I$(TOP)/kernel/msm-5.4/techpack/audio/include
+EXTRA_CFLAGS += -I$(TOP)/kernel/msm-5.4/techpack/audio/include/uapi/
 
-ifeq ($(CONFIG_NIO_DTB), y)
 EXTRA_CFLAGS += -DCONFIG_AW882XX_CODEC -DCONFIG_AW882XX_DSP
-endif
 
-aw882xx_k419-objs = aw882xx.o
-obj-$(CONFIG_SND_SOC_AWINIC_AW882XX) += aw882xx_k419.o
+aw882xx_k504-objs = aw882xx.o
+obj-m += aw882xx_k504.o

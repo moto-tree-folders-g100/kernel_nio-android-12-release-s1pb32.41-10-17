@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef __Q6AFE_V2_H__
 #define __Q6AFE_V2_H__
@@ -34,7 +35,11 @@
 #define RT_PROXY_DAI_001_TX	0xF0
 #define RT_PROXY_DAI_002_RX	0xF1
 #define RT_PROXY_DAI_002_TX	0xE1
+#define RT_PROXY_DAI_003_RX	0xE2
+#define RT_PROXY_DAI_003_TX	0xF2
 #define VIRTUAL_ID_TO_PORTID(val) ((val & 0xF) | 0x2000)
+#define PORTID_TO_IDX(val)	((val & 0xF) >> 1)
+#define NUM_RX_PROXY_PORTS	2
 
 #define AFE_CLK_VERSION_V1    1
 #define AFE_CLK_VERSION_V2    2
@@ -47,6 +52,17 @@
 #define AFE_API_VERSION_V6		6
 /* for Speaker Protection V4 */
 #define AFE_API_VERSION_V9		9
+/* for external mclk dynamic switch */
+#define AFE_API_VERSION_V8		8
+#define AFE_API_VERSION_V10		10
+
+#define AFE_SAMPLING_RATE_8KHZ 8000
+
+/* the different modes for data*/
+#define BAP_UNICAST          1
+#define BAP_BROADCAST        2
+#define BAP_BA_SIMULCAST     3
+
 
 typedef int (*routing_cb)(int port);
 
@@ -290,6 +306,74 @@ enum {
 	IDX_RT_PROXY_PORT_002_TX,
 	/* IDX 212 */
 	IDX_HDMI_RX_MS,
+	/* IDX 213-> 228 */
+	IDX_AFE_PORT_ID_SEPTENARY_TDM_RX_0,
+	IDX_AFE_PORT_ID_SEPTENARY_TDM_TX_0,
+	IDX_AFE_PORT_ID_SEPTENARY_TDM_RX_1,
+	IDX_AFE_PORT_ID_SEPTENARY_TDM_TX_1,
+	IDX_AFE_PORT_ID_SEPTENARY_TDM_RX_2,
+	IDX_AFE_PORT_ID_SEPTENARY_TDM_TX_2,
+	IDX_AFE_PORT_ID_SEPTENARY_TDM_RX_3,
+	IDX_AFE_PORT_ID_SEPTENARY_TDM_TX_3,
+	IDX_AFE_PORT_ID_SEPTENARY_TDM_RX_4,
+	IDX_AFE_PORT_ID_SEPTENARY_TDM_TX_4,
+	IDX_AFE_PORT_ID_SEPTENARY_TDM_RX_5,
+	IDX_AFE_PORT_ID_SEPTENARY_TDM_TX_5,
+	IDX_AFE_PORT_ID_SEPTENARY_TDM_RX_6,
+	IDX_AFE_PORT_ID_SEPTENARY_TDM_TX_6,
+	IDX_AFE_PORT_ID_SEPTENARY_TDM_RX_7,
+	IDX_AFE_PORT_ID_SEPTENARY_TDM_TX_7,
+	/* IDX 229-> 244 */
+	IDX_AFE_PORT_ID_HSIF0_TDM_RX_0,
+	IDX_AFE_PORT_ID_HSIF0_TDM_TX_0,
+	IDX_AFE_PORT_ID_HSIF0_TDM_RX_1,
+	IDX_AFE_PORT_ID_HSIF0_TDM_TX_1,
+	IDX_AFE_PORT_ID_HSIF0_TDM_RX_2,
+	IDX_AFE_PORT_ID_HSIF0_TDM_TX_2,
+	IDX_AFE_PORT_ID_HSIF0_TDM_RX_3,
+	IDX_AFE_PORT_ID_HSIF0_TDM_TX_3,
+	IDX_AFE_PORT_ID_HSIF0_TDM_RX_4,
+	IDX_AFE_PORT_ID_HSIF0_TDM_TX_4,
+	IDX_AFE_PORT_ID_HSIF0_TDM_RX_5,
+	IDX_AFE_PORT_ID_HSIF0_TDM_TX_5,
+	IDX_AFE_PORT_ID_HSIF0_TDM_RX_6,
+	IDX_AFE_PORT_ID_HSIF0_TDM_TX_6,
+	IDX_AFE_PORT_ID_HSIF0_TDM_RX_7,
+	IDX_AFE_PORT_ID_HSIF0_TDM_TX_7,
+	/* IDX 244-> 259 */
+	IDX_AFE_PORT_ID_HSIF1_TDM_RX_0,
+	IDX_AFE_PORT_ID_HSIF1_TDM_TX_0,
+	IDX_AFE_PORT_ID_HSIF1_TDM_RX_1,
+	IDX_AFE_PORT_ID_HSIF1_TDM_TX_1,
+	IDX_AFE_PORT_ID_HSIF1_TDM_RX_2,
+	IDX_AFE_PORT_ID_HSIF1_TDM_TX_2,
+	IDX_AFE_PORT_ID_HSIF1_TDM_RX_3,
+	IDX_AFE_PORT_ID_HSIF1_TDM_TX_3,
+	IDX_AFE_PORT_ID_HSIF1_TDM_RX_4,
+	IDX_AFE_PORT_ID_HSIF1_TDM_TX_4,
+	IDX_AFE_PORT_ID_HSIF1_TDM_RX_5,
+	IDX_AFE_PORT_ID_HSIF1_TDM_TX_5,
+	IDX_AFE_PORT_ID_HSIF1_TDM_RX_6,
+	IDX_AFE_PORT_ID_HSIF1_TDM_TX_6,
+	IDX_AFE_PORT_ID_HSIF1_TDM_RX_7,
+	IDX_AFE_PORT_ID_HSIF1_TDM_TX_7,
+	/* IDX 260-> 275 */
+	IDX_AFE_PORT_ID_HSIF2_TDM_RX_0,
+	IDX_AFE_PORT_ID_HSIF2_TDM_TX_0,
+	IDX_AFE_PORT_ID_HSIF2_TDM_RX_1,
+	IDX_AFE_PORT_ID_HSIF2_TDM_TX_1,
+	IDX_AFE_PORT_ID_HSIF2_TDM_RX_2,
+	IDX_AFE_PORT_ID_HSIF2_TDM_TX_2,
+	IDX_AFE_PORT_ID_HSIF2_TDM_RX_3,
+	IDX_AFE_PORT_ID_HSIF2_TDM_TX_3,
+	IDX_AFE_PORT_ID_HSIF2_TDM_RX_4,
+	IDX_AFE_PORT_ID_HSIF2_TDM_TX_4,
+	IDX_AFE_PORT_ID_HSIF2_TDM_RX_5,
+	IDX_AFE_PORT_ID_HSIF2_TDM_TX_5,
+	IDX_AFE_PORT_ID_HSIF2_TDM_RX_6,
+	IDX_AFE_PORT_ID_HSIF2_TDM_TX_6,
+	IDX_AFE_PORT_ID_HSIF2_TDM_RX_7,
+	IDX_AFE_PORT_ID_HSIF2_TDM_TX_7,
 	AFE_MAX_PORTS
 };
 
@@ -315,6 +399,24 @@ struct vad_config {
 	u32 is_enable;
 	u32 pre_roll;
 };
+
+enum afe_mclk_src_id {
+	MCLK_SRC_INT = 0x00,
+	MCLK_SRC_EXT_0 = 0x01,
+	MCLK_SRC_MAX,
+};
+
+enum afe_mclk_freq {
+	MCLK_FREQ_MIN = 0,
+	MCLK_FREQ_11P2896_MHZ = MCLK_FREQ_MIN,
+	MCLK_FREQ_12P288_MHZ,
+	MCLK_FREQ_16P384_MHZ,
+	MCLK_FREQ_22P5792_MHZ,
+	MCLK_FREQ_24P576_MHZ,
+	MCLK_FREQ_MAX,
+};
+
+#define Q6AFE_EXT_MCLK_FREQ_DEFAULT 0
 
 struct afe_audio_buffer {
 	dma_addr_t phys;
@@ -390,15 +492,19 @@ int afe_unregister_get_events(u16 port_id);
 int afe_rt_proxy_port_write(phys_addr_t buf_addr_p,
 			u32 mem_map_handle, int bytes);
 int afe_rt_proxy_port_read(phys_addr_t buf_addr_p,
-			u32 mem_map_handle, int bytes);
+			u32 mem_map_handle, int bytes, int id);
 void afe_set_cal_mode(u16 port_id, enum afe_cal_mode afe_cal_mode);
 void afe_set_vad_cfg(u32 vad_enable, u32 preroll_config,
 		     u32 port_id);
 void afe_set_island_mode_cfg(u16 port_id, u32 enable_flag);
 void afe_get_island_mode_cfg(u16 port_id, u32 *enable_flag);
+int afe_send_cdc_dma_data_align(u16 port_id, u32 cdc_dma_data_align);
+int afe_set_power_mode_cfg(u16 port_id, u32 enable_flag);
+int afe_get_power_mode_cfg(u16 port_id, u32 *enable_flag);
 int afe_port_start(u16 port_id, union afe_port_config *afe_config,
 	u32 rate);
 int afe_set_tws_channel_mode(u32 foramt, u16 port_id, u32 channel_mode);
+int afe_set_lc3_channel_mode(u32 foramt, u16 port_id, u32 channel_mode);
 int afe_port_start_v2(u16 port_id, union afe_port_config *afe_config,
 		      u32 rate, u16 afe_in_channels, u16 afe_in_bit_width,
 		      struct afe_enc_config *enc_config,
@@ -432,6 +538,9 @@ int afe_pseudo_port_start_nowait(u16 port_id);
 int afe_pseudo_port_stop_nowait(u16 port_id);
 int afe_set_lpass_clock(u16 port_id, struct afe_clk_cfg *cfg);
 int afe_set_lpass_clock_v2(u16 port_id, struct afe_clk_set *cfg);
+void afe_set_cps_config(int src_port,
+			struct afe_cps_hw_intf_cfg *cps_config,
+			u32 ch_mask);
 int afe_set_lpass_clk_cfg(int index, struct afe_clk_set *cfg);
 int afe_set_digital_codec_core_clock(u16 port_id,
 			struct afe_digital_clk_cfg *cfg);
@@ -480,13 +589,20 @@ int afe_send_custom_tdm_header_cfg(
 int afe_tdm_port_start(u16 port_id, struct afe_tdm_port_config *tdm_port,
 		       u32 rate, u16 num_groups);
 void afe_set_routing_callback(routing_cb cb);
+int afe_port_send_logging_cfg(u16 port_id,
+	struct afe_param_id_port_data_log_disable_t *log_disable);
+int afe_port_send_afe_limiter_param(u16 port_id,
+	struct afe_param_id_port_afe_limiter_disable_t *disable_limiter);
 int afe_get_av_dev_drift(struct afe_param_id_dev_timing_stats *timing_stats,
 		u16 port);
+int afe_set_lpass_clk_cfg_ext_mclk_v2(int index,
+	struct afe_param_id_clock_set_v2_t *dyn_mclk_cfg, uint32_t mclk_freq);
 int afe_get_sp_rx_tmax_xmax_logging_data(
 		struct afe_sp_rx_tmax_xmax_logging_param *xt_logging,
 		u16 port_id);
 int afe_cal_init_hwdep(void *card);
 int afe_send_port_island_mode(u16 port_id);
+int afe_send_port_power_mode(u16 port_id);
 int afe_send_port_vad_cfg_params(u16 port_id);
 int afe_send_cmd_wakeup_register(void *handle, bool enable);
 void afe_register_wakeup_irq_callback(
@@ -496,6 +612,7 @@ int afe_get_doa_tracking_mon(u16 port_id,
 int afe_set_pll_clk_drift(u16 port_id, int32_t set_clk_drift,
 			  uint32_t clk_reset);
 int afe_set_clk_id(u16 port_id, uint32_t clk_id);
+void afe_set_lsm_afe_port_id(int idx, int lsm_port);
 
 enum {
 	AFE_LPASS_CORE_HW_BLOCK_ID_NONE,
@@ -505,6 +622,21 @@ enum {
 	AFE_LPASS_CORE_HW_DCODEC_BLOCK,
 	AFE_LPASS_CORE_HW_VOTE_MAX
 };
+int afe_set_source_clk(u16 port_id, const char *clk_src);
+void afe_set_clk_src_array(const char *clk_src[CLK_SRC_MAX]);
+int afe_set_mclk_src_cfg(u16 port_id, uint32_t mclk_src_id, uint32_t mclk_freq);
+
+typedef int (*afe_enable_mclk_and_get_info_cb_func) (void *private_data,
+			uint32_t enable, uint32_t mclk_freq,
+			struct afe_param_id_clock_set_v2_t *dyn_mclk_cfg);
+
+int afe_register_ext_mclk_cb(afe_enable_mclk_and_get_info_cb_func fn1,
+				void *private_data);
+void afe_unregister_ext_mclk_cb(void);
+
+#define AFE_LPASS_CORE_HW_BLOCK_ID_NONE                        0
+#define AFE_LPASS_CORE_HW_BLOCK_ID_AVTIMER                     2
+#define AFE_LPASS_CORE_HW_MACRO_BLOCK                          3
 
 /* Handles audio-video timer (avtimer) and BTSC vote requests from clients.
  */

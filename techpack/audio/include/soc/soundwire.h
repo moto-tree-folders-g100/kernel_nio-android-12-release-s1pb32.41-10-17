@@ -7,17 +7,20 @@
 #define _LINUX_SOUNDWIRE_H
 #include <linux/device.h>
 #include <linux/mutex.h>
-#include <linux/mod_devicetable.h>
 #include <linux/irqdomain.h>
+#include <linux/regmap.h>
+#include "audio_mod_devicetable.h"
 
+#define SWR_CLK_RATE_0P3MHZ       300000
 #define SWR_CLK_RATE_0P6MHZ       600000
 #define SWR_CLK_RATE_1P2MHZ      1200000
 #define SWR_CLK_RATE_2P4MHZ      2400000
 #define SWR_CLK_RATE_4P8MHZ      4800000
 #define SWR_CLK_RATE_9P6MHZ      9600000
-#define SWR_CLK_RATE_11P2896MHZ  1128960
+#define SWR_CLK_RATE_11P2896MHZ  11289600
 
 extern struct bus_type soundwire_type;
+struct swr_device;
 
 /* Soundwire supports max. of 8 channels per port */
 #define SWR_MAX_CHANNEL_NUM	8
@@ -29,6 +32,39 @@ extern struct bus_type soundwire_type;
  * configurations of all devices
  */
 #define SWR_MAX_MSTR_PORT_NUM	(SWR_MAX_DEV_NUM * SWR_MAX_DEV_PORT_NUM)
+
+/* Regmap support for soundwire interface */
+struct regmap *__devm_regmap_init_swr(struct swr_device *dev,
+				      const struct regmap_config *config,
+				      struct lock_class_key *lock_key,
+				      const char *lock_name);
+
+/**
+ * regmap_init_swr(): Initialise register map
+ *
+ * @swr: Device that will be interacted with
+ * @config: Configuration for register map
+ *
+ * The return value will be an ERR_PTR() on error or a valid pointer to
+ * a struct regmap.
+ */
+#define regmap_init_swr(swr, config)					\
+	__regmap_lockdep_wrapper(__regmap_init_swr, #config,		\
+				swr, config)
+
+/**
+ * devm_regmap_init_swr(): Initialise managed register map
+ *
+ * @swr: Device that will be interacted with
+ * @config: Configuration for register map
+ *
+ * The return value will be an ERR_PTR() on error or a valid pointer
+ * to a struct regmap.  The regmap will be automatically freed by the
+ * device management code.
+ */
+#define devm_regmap_init_swr(swr, config)                              \
+	__regmap_lockdep_wrapper(__devm_regmap_init_swr, #config,       \
+				swr, config)
 
 /* Indicates soundwire devices group information */
 enum {
@@ -70,7 +106,7 @@ struct swr_port_info {
 	u8 slave_port_id;
 	u8 offset1;
 	u8 offset2;
-	u8 sinterval;
+	u16 sinterval;
 	struct list_head list;
 	u8 master_port_id;
 	u8 hstart;

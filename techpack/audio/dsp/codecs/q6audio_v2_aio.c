@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -24,6 +24,7 @@ void q6_audio_cb(uint32_t opcode, uint32_t token,
 	case ASM_DATA_EVENT_WRITE_DONE_V2:
 	case ASM_DATA_EVENT_READ_DONE_V2:
 	case ASM_DATA_EVENT_RENDERED_EOS:
+	case ASM_DATA_EVENT_RENDERED_EOS_V2:
 	case ASM_DATA_CMD_MEDIA_FMT_UPDATE_V2:
 	case ASM_STREAM_CMD_SET_ENCDEC_PARAM:
 	case ASM_DATA_EVENT_SR_CM_CHANGE_NOTIFY:
@@ -61,6 +62,7 @@ void audio_aio_cb(uint32_t opcode, uint32_t token,
 		audio_aio_async_read_ack(audio, token, payload);
 		break;
 	case ASM_DATA_EVENT_RENDERED_EOS:
+	case ASM_DATA_EVENT_RENDERED_EOS_V2:
 		/* EOS Handle */
 		pr_debug("%s[%pK]:ASM_DATA_CMDRSP_EOS\n", __func__, audio);
 		if (audio->feedback) { /* Non-Tunnel mode */
@@ -108,7 +110,8 @@ void audio_aio_cb(uint32_t opcode, uint32_t token,
 		pr_err("%s: Received opcode:0x%x\n", __func__, opcode);
 		audio->stopped = 1;
 		audio->reset_event = true;
-		wake_up(&audio->event_wait);
+		if (audio->wake_event_initialized)
+			wake_up(&audio->event_wait);
 		break;
 	default:
 		break;

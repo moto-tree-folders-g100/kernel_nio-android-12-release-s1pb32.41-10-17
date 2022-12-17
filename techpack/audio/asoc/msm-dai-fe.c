@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 
@@ -11,6 +12,8 @@
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/soc.h>
+
+#include "msm-compress-q6-v2.h"
 
 static struct snd_soc_dai_ops msm_fe_dai_ops = {};
 
@@ -222,7 +225,7 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 			.rate_max = 384000,
 		},
 		.ops = &msm_fe_Multimedia_dai_ops,
-		.compress_new = snd_soc_new_compress,
+		.compress_new = msm_compr_new,
 		.name = "MultiMedia4",
 		.probe = fe_dai_probe,
 	},
@@ -308,7 +311,7 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 			.rate_max = 384000,
 		},
 		.ops = &msm_fe_Multimedia_dai_ops,
-		.compress_new = snd_soc_new_compress,
+		.compress_new = msm_compr_new,
 		.name = "MultiMedia7",
 		.probe = fe_dai_probe,
 	},
@@ -591,6 +594,29 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 		.probe = fe_dai_probe,
 	},
 	{
+		.capture = {
+			.stream_name = "TX4_CDC_DMA_HOSTLESS Capture",
+			.aif_name = "TX4_CDC_DMA_UL_HL",
+			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_11025 |
+				SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_22050 |
+				SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_44100 |
+				SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_88200 |
+				SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_176400 |
+				SNDRV_PCM_RATE_192000 | SNDRV_PCM_RATE_352800 |
+				SNDRV_PCM_RATE_384000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE |
+				   SNDRV_PCM_FMTBIT_S24_LE |
+				   SNDRV_PCM_FMTBIT_S24_3LE,
+			.channels_min = 1,
+			.channels_max = 8,
+			.rate_min = 8000,
+			.rate_max = 384000,
+		},
+		.ops = &msm_fe_dai_ops,
+		.name = "TX4_CDC_DMA_HOSTLESS",
+		.probe = fe_dai_probe,
+	},
+	{
 		.playback = {
 			.stream_name = "INT_FM_HOSTLESS Playback",
 			.aif_name = "INTFM_DL_HL",
@@ -685,35 +711,6 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 	},
 	{
 		.playback = {
-			.stream_name = "AFE Playback",
-			.aif_name = "PCM_RX",
-			.rates = (SNDRV_PCM_RATE_8000 |
-				SNDRV_PCM_RATE_16000 |
-				SNDRV_PCM_RATE_48000),
-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
-			.channels_min = 1,
-			.channels_max = 2,
-			.rate_min =     8000,
-			.rate_max =     48000,
-		},
-		.capture = {
-			.stream_name = "AFE Capture",
-			.aif_name = "PCM_TX",
-			.rates = (SNDRV_PCM_RATE_8000 |
-				SNDRV_PCM_RATE_16000 |
-				SNDRV_PCM_RATE_48000),
-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
-			.channels_min = 1,
-			.channels_max = 2,
-			.rate_min =     8000,
-			.rate_max =     48000,
-		},
-		.ops = &msm_fe_dai_ops,
-		.name = "AFE-PROXY",
-		.probe = fe_dai_probe,
-	},
-	{
-		.playback = {
 			.stream_name = "HDMI_HOSTLESS Playback",
 			.aif_name = "HDMI_DL_HL",
 			.rates = SNDRV_PCM_RATE_8000_48000,
@@ -726,6 +723,22 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 		},
 		.ops = &msm_fe_dai_ops,
 		.name = "HDMI_HOSTLESS",
+		.probe = fe_dai_probe,
+	},
+	{
+		.playback = {
+			.stream_name = "DISPLAY_PORT_HOSTLESS Playback",
+			.aif_name = "DP_DL_HL",
+			.rates = SNDRV_PCM_RATE_8000_48000,
+			.formats = (SNDRV_PCM_FMTBIT_S16_LE |
+				    SNDRV_PCM_FMTBIT_S24_LE),
+			.channels_min = 1,
+			.channels_max = 2,
+			.rate_min = 8000,
+			.rate_max = 48000,
+		},
+		.ops = &msm_fe_dai_ops,
+		.name = "DISPLAY_PORT_HOSTLESS",
 		.probe = fe_dai_probe,
 	},
 	{
@@ -975,6 +988,38 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 		},
 		.ops = &msm_fe_dai_ops,
 		.name = "QUAT_MI2S_RX_HOSTLESS",
+		.probe = fe_dai_probe,
+	},
+	{
+		.capture = {
+			.stream_name = "Senary MI2S_TX Hostless Capture",
+			.aif_name = "SEN_MI2S_UL_HL",
+			.rates = SNDRV_PCM_RATE_8000_48000,
+			.formats = (SNDRV_PCM_FMTBIT_S16_LE |
+				    SNDRV_PCM_FMTBIT_S24_LE),
+			.channels_min = 1,
+			.channels_max = 2,
+			.rate_min = 8000,
+			.rate_max = 48000,
+		},
+		.ops = &msm_fe_dai_ops,
+		.name = "SEN_MI2S_TX_HOSTLESS",
+		.probe = fe_dai_probe,
+	},
+	{
+		.playback = {
+			.stream_name = "Senary MI2S_RX Hostless Playback",
+			.aif_name = "SEN_MI2S_DL_HL",
+			.rates = SNDRV_PCM_RATE_8000_384000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE |
+				    SNDRV_PCM_FMTBIT_S24_LE,
+			.channels_min = 1,
+			.channels_max = 8,
+			.rate_min = 8000,
+			.rate_max = 384000,
+		},
+		.ops = &msm_fe_dai_ops,
+		.name = "SEN_MI2S_RX_HOSTLESS",
 		.probe = fe_dai_probe,
 	},
 	{
@@ -2401,7 +2446,7 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 			.rate_max = 384000,
 		},
 		.ops = &msm_fe_Multimedia_dai_ops,
-		.compress_new = snd_soc_new_compress,
+		.compress_new = msm_compr_new,
 		.name = "MultiMedia11",
 		.probe = fe_dai_probe,
 	},
@@ -2421,7 +2466,7 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 			.rate_max = 384000,
 		},
 		.ops = &msm_fe_Multimedia_dai_ops,
-		.compress_new = snd_soc_new_compress,
+		.compress_new = msm_compr_new,
 		.name = "MultiMedia12",
 		.probe = fe_dai_probe,
 	},
@@ -2441,7 +2486,7 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 			.rate_max = 384000,
 		},
 		.ops = &msm_fe_Multimedia_dai_ops,
-		.compress_new = snd_soc_new_compress,
+		.compress_new = msm_compr_new,
 		.name = "MultiMedia13",
 		.probe = fe_dai_probe,
 	},
@@ -2461,7 +2506,7 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 			.rate_max = 384000,
 		},
 		.ops = &msm_fe_Multimedia_dai_ops,
-		.compress_new = snd_soc_new_compress,
+		.compress_new = msm_compr_new,
 		.name = "MultiMedia14",
 		.probe = fe_dai_probe,
 	},
@@ -2481,7 +2526,7 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 			.rate_max = 384000,
 		},
 		.ops = &msm_fe_Multimedia_dai_ops,
-		.compress_new = snd_soc_new_compress,
+		.compress_new = msm_compr_new,
 		.name = "MultiMedia15",
 		.probe = fe_dai_probe,
 	},
@@ -2583,7 +2628,7 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 			.rate_max =     192000,
 		},
 		.ops = &msm_fe_Multimedia_dai_ops,
-		.compress_new = snd_soc_new_compress,
+		.compress_new = msm_compr_new,
 		.name = "MultiMedia17",
 		.probe = fe_dai_probe,
 	},
@@ -2602,7 +2647,7 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 			.rate_max =     192000,
 		},
 		.ops = &msm_fe_Multimedia_dai_ops,
-		.compress_new = snd_soc_new_compress,
+		.compress_new = msm_compr_new,
 		.name = "MultiMedia18",
 		.probe = fe_dai_probe,
 	},
@@ -2621,7 +2666,7 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 			.rate_max =     192000,
 		},
 		.ops = &msm_fe_Multimedia_dai_ops,
-		.compress_new = snd_soc_new_compress,
+		.compress_new = msm_compr_new,
 		.name = "MultiMedia19",
 		.probe = fe_dai_probe,
 	},
@@ -2839,7 +2884,7 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 			.rate_max = 384000,
 		},
 		.ops = &msm_fe_Multimedia_dai_ops,
-		.compress_new = snd_soc_new_compress,
+		.compress_new = msm_compr_new,
 		.name = "MultiMedia26",
 		.probe = fe_dai_probe,
 	},
@@ -2858,7 +2903,7 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 			.rate_max = 192000,
 		},
 		.ops = &msm_fe_Multimedia_dai_ops,
-		.compress_new = snd_soc_new_compress,
+		.compress_new = msm_compr_new,
 		.name = "MultiMedia27",
 		.probe = fe_dai_probe,
 	},
@@ -2877,7 +2922,7 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 		.rate_max =     192000,
 		},
 		.ops = &msm_fe_Multimedia_dai_ops,
-		.compress_new = snd_soc_new_compress,
+		.compress_new = msm_compr_new,
 		.name = "MultiMedia28",
 		.probe = fe_dai_probe,
 	},
@@ -2896,7 +2941,7 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 			.rate_max =     192000,
 		},
 		.ops = &msm_fe_Multimedia_dai_ops,
-		.compress_new = snd_soc_new_compress,
+		.compress_new = msm_compr_new,
 		.name = "MultiMedia29",
 		.probe = fe_dai_probe,
 	},
@@ -2915,8 +2960,140 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 			.rate_max =     192000,
 		},
 		.ops = &msm_fe_Multimedia_dai_ops,
-		.compress_new = snd_soc_new_compress,
+		.compress_new = msm_compr_new,
 		.name = "MultiMedia30",
+		.probe = fe_dai_probe,
+	},
+	{
+		.playback = {
+			.stream_name = "MultiMedia31 Playback",
+			.aif_name = "MM_DL31",
+			.rates = (SNDRV_PCM_RATE_8000_384000|
+				SNDRV_PCM_RATE_KNOT),
+			.formats = (SNDRV_PCM_FMTBIT_S16_LE |
+				SNDRV_PCM_FMTBIT_S24_LE |
+				SNDRV_PCM_FMTBIT_S24_3LE |
+				SNDRV_PCM_FMTBIT_S32_LE),
+			.channels_min = 1,
+			.channels_max = 32,
+			.rate_min =     8000,
+			.rate_max =     384000,
+		},
+		.capture = {
+			.stream_name = "MultiMedia31 Capture",
+			.aif_name = "MM_UL31",
+			.rates = (SNDRV_PCM_RATE_8000_384000 |
+				  SNDRV_PCM_RATE_KNOT),
+			.formats = (SNDRV_PCM_FMTBIT_S16_LE |
+				    SNDRV_PCM_FMTBIT_S24_LE |
+				    SNDRV_PCM_FMTBIT_S24_3LE |
+				    SNDRV_PCM_FMTBIT_S32_LE),
+			.channels_min = 1,
+			.channels_max = 32,
+			.rate_min = 8000,
+			.rate_max = 48000,
+		},
+		.ops = &msm_fe_Multimedia_dai_ops,
+		.name = "MultiMedia31",
+		.probe = fe_dai_probe,
+	},
+	{
+		.playback = {
+			.stream_name = "MultiMedia32 Playback",
+			.aif_name = "MM_DL32",
+			.rates = (SNDRV_PCM_RATE_8000_384000|
+				SNDRV_PCM_RATE_KNOT),
+			.formats = (SNDRV_PCM_FMTBIT_S16_LE |
+				SNDRV_PCM_FMTBIT_S24_LE |
+				SNDRV_PCM_FMTBIT_S24_3LE |
+				SNDRV_PCM_FMTBIT_S32_LE),
+			.channels_min = 1,
+			.channels_max = 32,
+			.rate_min =     8000,
+			.rate_max =     384000,
+		},
+		.capture = {
+			.stream_name = "MultiMedia32 Capture",
+			.aif_name = "MM_UL32",
+			.rates = (SNDRV_PCM_RATE_8000_384000 |
+				  SNDRV_PCM_RATE_KNOT),
+			.formats = (SNDRV_PCM_FMTBIT_S16_LE |
+				    SNDRV_PCM_FMTBIT_S24_LE |
+				    SNDRV_PCM_FMTBIT_S24_3LE |
+				    SNDRV_PCM_FMTBIT_S32_LE),
+			.channels_min = 1,
+			.channels_max = 32,
+			.rate_min = 8000,
+			.rate_max = 48000,
+		},
+		.ops = &msm_fe_Multimedia_dai_ops,
+		.name = "MultiMedia32",
+		.probe = fe_dai_probe,
+	},
+	{
+		.playback = {
+			.stream_name = "MultiMedia33 Playback",
+			.aif_name = "MM_DL33",
+			.rates = (SNDRV_PCM_RATE_8000_384000 |
+				  SNDRV_PCM_RATE_KNOT),
+			.formats = (SNDRV_PCM_FMTBIT_S16_LE |
+				    SNDRV_PCM_FMTBIT_S24_LE |
+				    SNDRV_PCM_FMTBIT_S24_3LE |
+				    SNDRV_PCM_FMTBIT_S32_LE),
+			.channels_min = 1,
+			.channels_max = 32,
+			.rate_min = 8000,
+			.rate_max = 384000,
+		},
+		.capture = {
+			.stream_name = "MultiMedia33 Capture",
+			.aif_name = "MM_UL33",
+			.rates = (SNDRV_PCM_RATE_8000_384000 |
+				  SNDRV_PCM_RATE_KNOT),
+			.formats = (SNDRV_PCM_FMTBIT_S16_LE |
+				    SNDRV_PCM_FMTBIT_S24_LE |
+				    SNDRV_PCM_FMTBIT_S24_3LE |
+				    SNDRV_PCM_FMTBIT_S32_LE),
+			.channels_min = 1,
+			.channels_max = 32,
+			.rate_min = 8000,
+			.rate_max = 48000,
+		},
+		.ops = &msm_fe_Multimedia_dai_ops,
+		.name = "MultiMedia33",
+		.probe = fe_dai_probe,
+	},
+	{
+		.playback = {
+			.stream_name = "MultiMedia34 Playback",
+			.aif_name = "MM_DL34",
+			.rates = (SNDRV_PCM_RATE_8000_384000 |
+				  SNDRV_PCM_RATE_KNOT),
+			.formats = (SNDRV_PCM_FMTBIT_S16_LE |
+				    SNDRV_PCM_FMTBIT_S24_LE |
+				    SNDRV_PCM_FMTBIT_S24_3LE |
+				    SNDRV_PCM_FMTBIT_S32_LE),
+			.channels_min = 1,
+			.channels_max = 32,
+			.rate_min = 8000,
+			.rate_max = 384000,
+		},
+		.capture = {
+			.stream_name = "MultiMedia34 Capture",
+			.aif_name = "MM_UL34",
+			.rates = (SNDRV_PCM_RATE_8000_384000 |
+				  SNDRV_PCM_RATE_KNOT),
+			.formats = (SNDRV_PCM_FMTBIT_S16_LE |
+				    SNDRV_PCM_FMTBIT_S24_LE |
+				    SNDRV_PCM_FMTBIT_S24_3LE |
+				    SNDRV_PCM_FMTBIT_S32_LE),
+			.channels_min = 1,
+			.channels_max = 32,
+			.rate_min = 8000,
+			.rate_max = 48000,
+		},
+		.ops = &msm_fe_Multimedia_dai_ops,
+		.name = "MultiMedia34",
 		.probe = fe_dai_probe,
 	},
 };

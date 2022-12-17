@@ -66,18 +66,6 @@ enum {
 
 };
 
-enum {
-	DMIC0 = 0,
-	DMIC1,
-	DMIC2,
-	DMIC3,
-	DMIC4,
-	DMIC5,
-	DMIC6,
-	DMIC7,
-	DMIC_MAX
-};
-
 struct macro_ops {
 	int (*init)(struct snd_soc_component *component);
 	int (*exit)(struct snd_soc_component *component);
