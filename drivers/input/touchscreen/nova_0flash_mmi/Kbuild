@@ -1,9 +1,10 @@
 # add -Wall to try to catch everything we can.
 EXTRA_CFLAGS += -Wall
-EXTRA_CFLAGS += -I.
+EXTRA_CFLAGS += -I$(ANDROID_BUILD_TOP)/motorola/kernel/modules/include \
+		-I$(ANDROID_BUILD_TOP)/motorola/kernel/modules/drivers/input/touchscreen/nova_0flash_mmi
 
 ifeq ($(filter m y, $(CONFIG_TOUCHSCREEN_NT36xxx_HOSTDL_SPI)),)
-	obj-$(CONFIG_TOUCHSCREEN_NT36xxx_HOSTDL_SPI_MMI) += nova_0flash_mmi.o
+	obj-m := nova_0flash_mmi.o
 endif
 ifneq ($(filter m y,$(CONFIG_INPUT_NOVA_0FLASH_MMI_ENABLE_DOUBLE_TAP)),)
 	EXTRA_CFLAGS += -DNVT_SENSOR_EN
@@ -42,6 +43,10 @@ ifneq ($(filter m y,$(CONFIG_INPUT_NOVA_0FLASH_MMI_PEN_NOTIFIER)),)
 	KBUILD_EXTRA_SYMBOLS += $(CURDIR)/$(KBUILD_EXTMOD)/../../../misc/pen/$(GKI_OBJ_MODULE_DIR)/Module.symvers
 	EXTRA_CFLAGS += -DNOVATECH_PEN_NOTIFIER
 endif
+ifneq ($(filter m y,$(CONFIG_INPUT_NOVA_EDGE_SUPPRESSION)),)
+	EXTRA_CFLAGS += -DEDGE_SUPPRESSION
+endif
+
 nova_0flash_mmi-objs += nt36xxx.o
 nova_0flash_mmi-objs += nt36xxx_ext_proc.o
 nova_0flash_mmi-objs += nt36xxx_fw_update.o

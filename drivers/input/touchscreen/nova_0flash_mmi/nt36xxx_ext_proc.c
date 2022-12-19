@@ -607,6 +607,33 @@ static const struct file_operations nvt_fwupdate_fops = {
 	.read = nvt_fwupdate_read,
 };
 
+#ifdef EDGE_SUPPRESSION
+typedef enum{
+	 EDGE_REJECT=5,
+}CMD_OFFSET;
+
+static uint8_t nvt_cmd_show(int offset)
+{
+	uint8_t buf[3] = {0};
+	int32_t ret = 0;
+
+	//---set xdata index to EVENT BUF ADDR---
+	ret = nvt_set_page(ts->mmap->EVENT_BUF_ADDR | EVENT_MAP_HOST_CMD);
+	if (ret < 0) {
+		NVT_ERR("Set event buffer index fail!\n");
+		mutex_unlock(&ts->lock);
+		return ret;
+	}
+
+	//---read cmd status---
+	buf[0] = EVENT_MAP_HOST_CMD_CHECK;
+	buf[1] = 0xFF;
+	CTP_SPI_READ(ts->client, buf, 2);
+
+	return ((buf[1]>> offset) & 0x03);
+
+}
+#endif
 
 int32_t nvt_cmd_store(uint8_t u8Cmd)
 {
@@ -678,6 +705,29 @@ int nvt_palm_set(bool enabled) {
 	}
 
 	return ret;
+}
+#endif
+
+#ifdef EDGE_SUPPRESSION
+int32_t nvt_edge_reject_set(uint32_t status) {
+	int ret = 0;
+
+	if(status == VERTICAL)// 0 180
+		ret = nvt_cmd_store(EDGE_REJECT_VERTICLE_CMD);
+	else if(status == LEFT_UP) //90
+		ret = nvt_cmd_store(EDGE_REJECT_LEFT_UP);
+	else if(status == RIGHT_UP) //270
+		ret = nvt_cmd_store(EDGE_REJECT_RIGHT_UP);
+	else {
+		NVT_ERR("Invalid parameter %d!\n", status);
+		ret = -1;
+	}
+
+	return ret;
+}
+
+uint8_t nvt_edge_reject_read(void) {
+	return nvt_cmd_show(EDGE_REJECT);
 }
 #endif
 

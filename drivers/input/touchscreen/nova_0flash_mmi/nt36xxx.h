@@ -102,6 +102,12 @@ extern const uint16_t touch_key_array[TOUCH_KEY_NUM];
 #define PANEL_REAL_HEIGHT 15768
 #endif
 #endif
+#define EDGE_REJECT_VERTICLE_CMD 0xBA
+#define EDGE_REJECT_LEFT_UP 0xBB
+#define EDGE_REJECT_RIGHT_UP 0xBC
+#define VERTICAL   1
+#define LEFT_UP   2
+#define RIGHT_UP  3
 
 /* Enable only when module have tp reset pin and connected to host */
 #define NVT_TOUCH_SUPPORT_HW_RST 0
@@ -221,6 +227,9 @@ struct nvt_ts_data {
 #ifdef PALM_GESTURE
 	bool palm_enabled;
 #endif
+#ifdef EDGE_SUPPRESSION
+	uint32_t edge_reject_state;
+#endif
 	char product_id[10];
 	uint8_t fw_type;
 	uint32_t build_id;
@@ -262,6 +271,7 @@ typedef enum {
 typedef enum {
     EVENT_MAP_HOST_CMD                      = 0x50,
     EVENT_MAP_HANDSHAKING_or_SUB_CMD_BYTE   = 0x51,
+    EVENT_MAP_HOST_CMD_CHECK                = 0x5C,
     EVENT_MAP_RESET_COMPLETE                = 0x60,
     EVENT_MAP_FWINFO                        = 0x78,
     EVENT_MAP_PROJECTID                     = 0x9A,
@@ -328,5 +338,9 @@ extern int nvt_mcu_pen_detect_set(uint8_t pen_detect);
 #endif
 #ifdef PALM_GESTURE
 extern int nvt_palm_set(bool enabled);
+#endif
+#ifdef EDGE_SUPPRESSION
+extern int32_t nvt_edge_reject_set(uint32_t status);
+extern uint8_t nvt_edge_reject_read(void);
 #endif
 #endif /* _LINUX_NVT_TOUCH_H */

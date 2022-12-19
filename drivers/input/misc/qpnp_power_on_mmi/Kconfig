@@ -6,3 +6,4 @@ config INPUT_QPNP_POWER_ON_MMI
           functionality of Qualcomm Technologies, Inc. PNP PMICs.  It supports
           reporting the change in status of the KPDPWR_N line (connected to the
           power-key) as well as reset features.
+

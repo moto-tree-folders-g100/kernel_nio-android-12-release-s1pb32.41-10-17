@@ -1144,6 +1144,9 @@ static int nova_check_dt(struct device_node *np)
 {
 	int i;
 	int count;
+	int ret = -ENODEV;
+	bool dts_using_dummy = false;
+
 	struct device_node *node;
 	struct drm_panel *panel;
 
@@ -1155,16 +1158,28 @@ static int nova_check_dt(struct device_node *np)
 	for (i = 0; i < count; i++) {
 		node = of_parse_phandle(np, "panel", i);
 		panel = of_drm_find_panel(node);
+		NVT_LOG("node->name %s !\n", node->name);
+		if(strstr(node->name, "dummy")) {
+			dts_using_dummy = true;
+		}
 		of_node_put(node);
 		if (!IS_ERR(panel)) {
 			active_panel = panel;
 			active_panel_name = node->name;
 			NVT_LOG("nova_check_dt, active_panel: %s !\n", active_panel_name);
-			return 0;
+			ret = 0;
 		}
 	}
 
-	return -ENODEV;
+	if(dts_using_dummy && ret)
+		ret = -EPROBE_DEFER;
+	if(active_panel_name != NULL) {
+		if(strstr(active_panel_name, "dummy")) {
+			NVT_LOG("Using dummy panel! Return!\n");
+			ret = -ENODEV;
+		}
+	}
+	return ret;
 }
 #endif
 #endif
@@ -1566,7 +1581,25 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 			nvt_update_firmware(nvt_boot_firmware_name);
 		else
 			nvt_update_firmware(BOOT_UPDATE_FIRMWARE_NAME);
-		goto XFER_ERROR;
+
+		mutex_unlock(&ts->lock);
+
+		if (ts->charger_detection) {
+			queue_work(ts->charger_detection->nvt_charger_notify_wq, &ts->charger_detection->charger_notify_work);
+		}
+
+#ifdef NOVATECH_PEN_NOTIFIER
+		if(!ts->fw_ready_flag)
+			ts->fw_ready_flag = true;
+		nvt_mcu_pen_detect_set(ts->nvt_pen_detect_flag);
+#endif
+#ifdef PALM_GESTURE
+		nvt_palm_set(ts->palm_enabled);
+#endif
+#ifdef EDGE_SUPPRESSION
+		nvt_edge_reject_set(ts->edge_reject_state);
+#endif
+		return IRQ_HANDLED;
    }
 #endif /* #if NVT_TOUCH_WDT_RECOVERY */
 
@@ -1999,12 +2032,54 @@ static ssize_t nvt_palm_settings_store(struct device *dev,
 }
 #endif
 
+#ifdef EDGE_SUPPRESSION
+static ssize_t nvt_edge_reject_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count) {
+	int res = 0;
+	uint8_t state;
+
+	res = kstrtou8(buf, 0, &state);
+	if (res < 0)
+		return res;
+
+	ts->edge_reject_state = state;
+
+	NVT_LOG("edge_reject_state %d!\n", state);
+
+	if(nvt_edge_reject_read() != state) {
+		nvt_edge_reject_set(ts->edge_reject_state);
+	}
+
+	return count;
+}
+
+static ssize_t nvt_edge_reject_show(struct device *dev,
+	struct device_attribute *attr, char *buf) {
+
+	uint8_t ret;
+
+	ret = nvt_edge_reject_read();
+
+	if(ret == VERTICAL)
+		return scnprintf(buf, PAGE_SIZE, "VERTICAL\n");
+	else if(ret == LEFT_UP)
+		return scnprintf(buf, PAGE_SIZE, "LEFT_UP\n");
+	else if(ret == RIGHT_UP)
+		return scnprintf(buf, PAGE_SIZE, "RIGHT_UP\n");
+	else
+		return scnprintf(buf, PAGE_SIZE, "Not Support!\n");
+}
+#endif
+
 static struct device_attribute touchscreen_attributes[] = {
 	__ATTR_RO(path),
 	__ATTR_RO(vendor),
 	__ATTR_RO(ic_ver),
 #ifdef PALM_GESTURE
 	__ATTR(palm_settings, S_IRUGO | S_IWUSR | S_IWGRP, nvt_palm_settings_show, nvt_palm_settings_store),
+#endif
+#ifdef EDGE_SUPPRESSION
+	__ATTR(rotate, S_IRUGO | S_IWUSR | S_IWGRP, nvt_edge_reject_show, nvt_edge_reject_store),
 #endif
 	__ATTR_NULL
 };
@@ -2031,7 +2106,7 @@ int32_t nvt_fw_class_init(bool create)
 	static int minor;
 
 	if (create) {
-#ifdef PALM_GESTURE
+#if defined (PALM_GESTURE) || defined (EDGE_SUPPRESSION)
 		ret = alloc_chrdev_region(&devno, 0, 1, NVT_PRIMARY_NAME);
 #else
 		ret = alloc_chrdev_region(&devno, 0, 1, NVT_SPI_NAME);
@@ -2051,7 +2126,7 @@ int32_t nvt_fw_class_init(bool create)
 
 		ts_class_dev = device_create(touchscreen_class, NULL,
 				devno,
-#ifdef PALM_GESTURE
+#if defined (PALM_GESTURE) || defined (EDGE_SUPPRESSION)
 				ts, NVT_PRIMARY_NAME);
 #else
 				ts, NVT_SPI_NAME);
@@ -2071,7 +2146,7 @@ int32_t nvt_fw_class_init(bool create)
 		if (error)
 			goto device_destroy;
 		else
-#ifdef PALM_GESTURE
+#if defined (PALM_GESTURE) || defined (EDGE_SUPPRESSION)
 			NVT_LOG("create /sys/class/touchscreen/%s Succeeded!\n", NVT_PRIMARY_NAME);
 #else
 			NVT_LOG("create /sys/class/touchscreen/%s Succeeded!\n", NVT_SPI_NAME);
@@ -2314,6 +2389,9 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 
 #ifdef PALM_GESTURE
 	ts->palm_enabled = false;
+#endif
+#ifdef EDGE_SUPPRESSION
+	ts->edge_reject_state = VERTICAL;
 #endif
 
 	sprintf(ts->phys, "input/ts");
