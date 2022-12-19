@@ -60,4 +60,3 @@ LOCAL_MODULE := nova_0flash_mmi.ko
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_PATH := $(NOVA_MMI_MODULE_PATH)
 KBUILD_OPTIONS_GKI += GKI_OBJ_MODULE_DIR=gki
-include $(DLKM_DIR)/AndroidKernelModule.mk
